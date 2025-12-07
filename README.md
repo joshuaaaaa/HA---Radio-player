@@ -43,14 +43,14 @@ A modern **radio player card** for Home Assistant! Browse and play internet radi
 
 ### Manual Installation
 
-1. Download `winamp-radio-card.js` from the [latest release](https://github.com/joshuaaaaa/HA---Radio-card/releases)
-2. Copy `winamp-radio-card.js` to your `config/www` folder
+1. Download `radio-browser-card.js` from the [latest release](https://github.com/joshuaaaaa/HA---Radio-card/releases)
+2. Copy `radio-browser-card.js` to your `config/www` folder
 3. Add to your `configuration.yaml`:
 
 ```yaml
 lovelace:
   resources:
-    - url: /local/winamp-radio-card.js
+    - url: /local/radio-browser-card.js
       type: module
 ```
 
@@ -62,14 +62,14 @@ lovelace:
 ### Basic Configuration
 
 ```yaml
-type: custom:winamp-radio-card
+type: custom:radio-browser-card
 name: Radio Browser
 ```
 
 ### With Pre-selected Media Player
 
 ```yaml
-type: custom:winamp-radio-card
+type: custom:radio-browser-card
 name: My Radio
 entity: media_player.living_room_speaker
 ```
@@ -143,14 +143,14 @@ Click anywhere on the vertical Volume slider to set the volume level.
 ### Simple Setup
 
 ```yaml
-type: custom:winamp-radio-card
+type: custom:radio-browser-card
 name: Radio Player
 ```
 
 ### Living Room Radio
 
 ```yaml
-type: custom:winamp-radio-card
+type: custom:radio-browser-card
 name: Living Room Radio
 entity: media_player.living_room
 ```
@@ -159,12 +159,12 @@ entity: media_player.living_room
 
 ```yaml
 # Kitchen
-type: custom:winamp-radio-card
+type: custom:radio-browser-card
 name: Kitchen Radio
 entity: media_player.kitchen
 
 # Bedroom
-type: custom:winamp-radio-card
+type: custom:radio-browser-card
 name: Bedroom Radio
 entity: media_player.bedroom
 ```
