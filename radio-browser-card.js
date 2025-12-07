@@ -1,4 +1,4 @@
-class WinampRadioCard extends HTMLElement {
+class RadioBrowserCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
@@ -15,7 +15,7 @@ class WinampRadioCard extends HTMLElement {
   }
 
   setConfig(config) {
-    this.config = { name: config.name || 'Winamp Radio', entity: config.entity || null, ...config };
+    this.config = { name: config.name || 'Radio Browser', entity: config.entity || null, ...config };
     if (this.config.entity) {
       this._selectedMediaPlayer = this.config.entity;
     }
@@ -838,11 +838,11 @@ class WinampRadioCard extends HTMLElement {
   setupEventListeners() {}
 
   static getConfigElement() {
-    return document.createElement("winamp-radio-card-editor");
+    return document.createElement("radio-browser-card-editor");
   }
 
   static getStubConfig() {
-    return { name: "Winamp Radio" };
+    return { name: "Radio Browser" };
   }
 
   getCardSize() {
@@ -850,10 +850,10 @@ class WinampRadioCard extends HTMLElement {
   }
 }
 
-customElements.define('winamp-radio-card', WinampRadioCard);
+customElements.define('radio-browser-card', RadioBrowserCard);
 window.customCards = window.customCards || [];
 window.customCards.push({
-  type: 'winamp-radio-card',
+  type: 'radio-browser-card',
   name: 'Radio Browser Card',
   description: 'Modern radio player card for Home Assistant with gradient design and smooth controls'
 });
