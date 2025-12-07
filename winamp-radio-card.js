@@ -384,13 +384,13 @@ class WinampRadioCard extends HTMLElement {
     if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
-    const bars = 16;
+    const bars = 20;
     const barWidth = Math.floor(canvas.width / bars);
     const heights = new Array(bars).fill(0);
 
     this._visualizerInterval = setInterval(() => {
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // Clear with transparent background
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       for (let i = 0; i < bars; i++) {
         // Random height with some smoothing
@@ -400,9 +400,13 @@ class WinampRadioCard extends HTMLElement {
         const x = i * barWidth;
         const y = canvas.height - barHeight;
 
-        // Draw bar with Winamp-style colors
-        ctx.fillStyle = '#00FF00';
-        ctx.fillRect(x, y, barWidth - 1, barHeight);
+        // Create gradient for each bar
+        const gradient = ctx.createLinearGradient(0, canvas.height, 0, 0);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0.4)');
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, y, barWidth - 2, barHeight);
       }
     }, 50); // 20 FPS
   }
@@ -416,8 +420,7 @@ class WinampRadioCard extends HTMLElement {
       const canvas = this.shadowRoot.querySelector('.visualizer');
       if (canvas) {
         const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
       }
     }
   }
@@ -439,7 +442,7 @@ class WinampRadioCard extends HTMLElement {
 
         :host {
           display: block;
-          font-family: Arial, sans-serif;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
 
         .winamp-container {
@@ -447,59 +450,76 @@ class WinampRadioCard extends HTMLElement {
           position: relative;
         }
 
-        /* Main Window - uses authentic MAIN.BMP */
+        /* Main Window - Modern gradient design */
         .main-window {
           width: 275px;
           height: 116px;
-          background: url(/local/winamp-skin/MAIN.BMP) no-repeat;
-          background-size: 275px 116px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          border-radius: 12px;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
           position: relative;
-          image-rendering: pixelated;
-          image-rendering: crisp-edges;
+          overflow: hidden;
+        }
+
+        /* Glass morphism overlay */
+        .main-window::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 100%);
+          pointer-events: none;
         }
 
         .track-title {
           position: absolute;
-          top: 26px;
-          left: 111px;
-          width: 155px;
-          height: 10px;
-          color: #00FF00;
-          font-size: 8px;
-          font-family: 'Courier New', monospace;
+          top: 15px;
+          left: 15px;
+          right: 15px;
+          height: 20px;
+          color: #ffffff;
+          font-size: 11px;
+          font-weight: 500;
           overflow: hidden;
           white-space: nowrap;
           text-overflow: ellipsis;
-          text-shadow: 0 0 2px #00FF00;
-          line-height: 10px;
+          text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+          line-height: 20px;
+          z-index: 1;
         }
 
-        /* Visualizer - covers original visualizer on MAIN.BMP */
+        /* Visualizer */
         .visualizer {
           position: absolute;
           top: 43px;
-          left: 24px;
-          width: 76px;
-          height: 16px;
-          background: transparent;
-          image-rendering: pixelated;
+          left: 15px;
+          width: 100px;
+          height: 24px;
+          background: rgba(0, 0, 0, 0.2);
+          border-radius: 6px;
+          backdrop-filter: blur(10px);
         }
 
-        /* Volume control - covers original volume slider on MAIN.BMP */
+        /* Volume control */
         .volume-control {
           position: absolute;
-          top: 57px;
-          left: 107px;
-          width: 68px;
-          height: 13px;
-          background: transparent;
+          top: 43px;
+          right: 15px;
+          width: 130px;
+          height: 24px;
+          background: rgba(0, 0, 0, 0.2);
+          border-radius: 6px;
+          backdrop-filter: blur(10px);
           display: flex;
           align-items: center;
+          padding: 0 10px;
         }
 
         .volume-slider {
           width: 100%;
-          height: 8px;
+          height: 4px;
           -webkit-appearance: none;
           background: transparent;
           outline: none;
@@ -507,116 +527,186 @@ class WinampRadioCard extends HTMLElement {
 
         .volume-slider::-webkit-slider-track {
           width: 100%;
-          height: 8px;
-          background: #00FF00;
-          border: none;
+          height: 4px;
+          background: rgba(255, 255, 255, 0.3);
+          border-radius: 2px;
         }
 
         .volume-slider::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
-          width: 8px;
-          height: 8px;
-          background: #FFFFFF;
+          width: 14px;
+          height: 14px;
+          background: #ffffff;
           cursor: pointer;
-          border: 1px solid #000000;
+          border-radius: 50%;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
 
         .volume-slider::-moz-range-track {
           width: 100%;
-          height: 8px;
-          background: #00FF00;
-          border: none;
+          height: 4px;
+          background: rgba(255, 255, 255, 0.3);
+          border-radius: 2px;
         }
 
         .volume-slider::-moz-range-thumb {
-          width: 8px;
-          height: 8px;
-          background: #FFFFFF;
+          width: 14px;
+          height: 14px;
+          background: #ffffff;
           cursor: pointer;
-          border: 1px solid #000000;
+          border-radius: 50%;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+          border: none;
         }
 
-        /* Control buttons - from CBUTTONS.BMP */
+        /* Control buttons - Modern CSS design */
         .control-buttons {
           position: absolute;
-          top: 88px;
-          left: 16px;
+          bottom: 12px;
+          left: 50%;
+          transform: translateX(-50%);
           display: flex;
-          gap: 0;
+          gap: 8px;
         }
 
         .control-btn {
-          width: 23px;
-          height: 18px;
-          background: url(/local/winamp-skin/CBUTTONS.BMP);
-          background-size: 136px 36px;
-          image-rendering: pixelated;
+          width: 32px;
+          height: 32px;
+          background: rgba(255, 255, 255, 0.2);
+          backdrop-filter: blur(10px);
+          border-radius: 50%;
           cursor: pointer;
           border: none;
-          padding: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s;
+          position: relative;
         }
 
-        .control-btn.eject {
-          width: 22px;
-          height: 16px;
+        .control-btn:hover {
+          background: rgba(255, 255, 255, 0.3);
+          transform: scale(1.1);
         }
 
-        .btn-prev { background-position: 0px 0px; }
-        .btn-prev:active { background-position: 0px -18px; }
+        .control-btn:active {
+          transform: scale(0.95);
+        }
 
-        .btn-play { background-position: -23px 0px; }
-        .btn-play:active { background-position: -23px -18px; }
+        /* Button icons using CSS */
+        .control-btn::before {
+          content: '';
+          width: 0;
+          height: 0;
+          border-style: solid;
+        }
 
-        .btn-pause { background-position: -46px 0px; }
-        .btn-pause:active { background-position: -46px -18px; }
+        .btn-prev::before {
+          border-width: 6px 10px 6px 0;
+          border-color: transparent #ffffff transparent transparent;
+          margin-right: -2px;
+        }
 
-        .btn-stop { background-position: -69px 0px; }
-        .btn-stop:active { background-position: -69px -18px; }
+        .btn-prev::after {
+          content: '';
+          position: absolute;
+          width: 2px;
+          height: 12px;
+          background: #ffffff;
+          left: 10px;
+        }
 
-        .btn-next { background-position: -92px 0px; }
-        .btn-next:active { background-position: -92px -18px; }
+        .btn-play::before {
+          border-width: 7px 0 7px 12px;
+          border-color: transparent transparent transparent #ffffff;
+          margin-left: 2px;
+        }
 
-        .btn-eject { background-position: -114px 0px; }
-        .btn-eject:active { background-position: -114px -16px; }
+        .btn-pause::before {
+          content: '';
+          width: 3px;
+          height: 14px;
+          background: #ffffff;
+          box-shadow: 6px 0 0 #ffffff;
+        }
 
-        /* Playlist Window - simple black box */
+        .btn-stop::before {
+          content: '';
+          width: 12px;
+          height: 12px;
+          background: #ffffff;
+          border-radius: 2px;
+        }
+
+        .btn-next::before {
+          border-width: 6px 0 6px 10px;
+          border-color: transparent transparent transparent #ffffff;
+          margin-left: 2px;
+        }
+
+        .btn-next::after {
+          content: '';
+          position: absolute;
+          width: 2px;
+          height: 12px;
+          background: #ffffff;
+          right: 10px;
+        }
+
+        /* Playlist Window - Modern design */
         .playlist-window {
           width: 275px;
-          background: #000000;
-          border: 1px solid #404040;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          border-radius: 12px;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
           position: relative;
-          margin-top: 0;
+          margin-top: 8px;
+          overflow: hidden;
         }
 
         /* Search controls at top */
         .playlist-controls {
-          padding: 5px;
-          background: #000000;
-          border-bottom: 1px solid #404040;
+          padding: 12px;
+          background: rgba(0, 0, 0, 0.2);
+          backdrop-filter: blur(10px);
         }
 
         .player-select, .country-select {
           width: 100%;
-          height: 18px;
-          background: #000000;
-          color: #00FF00;
-          border: 1px solid #404040;
-          font-size: 9px;
-          font-family: Arial, sans-serif;
-          padding: 2px;
-          margin-bottom: 4px;
+          height: 32px;
+          background: rgba(255, 255, 255, 0.1);
+          color: #ffffff;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 6px;
+          font-size: 12px;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          padding: 6px 10px;
+          margin-bottom: 8px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .player-select:hover, .country-select:hover {
+          background: rgba(255, 255, 255, 0.15);
+          border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .player-select:focus, .country-select:focus {
+          outline: none;
+          background: rgba(255, 255, 255, 0.2);
+          border-color: rgba(255, 255, 255, 0.4);
         }
 
         .player-select option, .country-select option {
-          background: #000000;
-          color: #00FF00;
+          background: #764ba2;
+          color: #ffffff;
         }
 
         /* Playlist body */
         .playlist-body {
           height: 150px;
-          background: #000000;
+          background: rgba(0, 0, 0, 0.2);
           position: relative;
         }
 
@@ -629,54 +719,64 @@ class WinampRadioCard extends HTMLElement {
           bottom: 0;
           overflow-y: scroll;
           overflow-x: hidden;
-          padding: 5px;
+          padding: 8px;
         }
 
         .playlist-display::-webkit-scrollbar {
-          width: 6px;
+          width: 8px;
         }
 
         .playlist-display::-webkit-scrollbar-track {
-          background: #000000;
+          background: rgba(0, 0, 0, 0.1);
         }
 
         .playlist-display::-webkit-scrollbar-thumb {
-          background: #404040;
+          background: rgba(255, 255, 255, 0.3);
+          border-radius: 4px;
+        }
+
+        .playlist-display::-webkit-scrollbar-thumb:hover {
+          background: rgba(255, 255, 255, 0.4);
         }
 
         .playlist-items {
-          padding: 2px;
+          padding: 0;
         }
 
-        /* Authentic Winamp playlist colors from PLEDIT.TXT */
+        /* Modern playlist item styling */
         .playlist-item {
-          color: #00FF00;
+          color: rgba(255, 255, 255, 0.9);
           background: transparent;
-          font-size: 10px;
-          font-family: Arial, sans-serif;
-          padding: 1px 2px;
+          font-size: 11px;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          padding: 8px 10px;
           cursor: pointer;
           display: flex;
-          gap: 4px;
+          gap: 8px;
           white-space: nowrap;
+          border-radius: 6px;
+          margin-bottom: 4px;
+          transition: all 0.2s;
         }
 
         .playlist-item:hover {
-          background: #0A0A0A;
+          background: rgba(255, 255, 255, 0.1);
         }
 
         .playlist-item.selected {
-          background: #1A1A1A;
+          background: rgba(255, 255, 255, 0.15);
         }
 
         .playlist-item.current {
-          color: #FFFFFF;
-          background: #0000FF;
+          color: #ffffff;
+          background: rgba(255, 255, 255, 0.25);
+          font-weight: 500;
         }
 
         .item-number {
-          color: inherit;
-          min-width: 20px;
+          color: rgba(255, 255, 255, 0.6);
+          min-width: 24px;
+          font-size: 10px;
         }
 
         .item-title {
@@ -689,10 +789,10 @@ class WinampRadioCard extends HTMLElement {
       <div class="winamp-container">
         <!-- Main Player Window -->
         <div class="main-window">
-          <div class="track-title">Winamp Radio Browser</div>
+          <div class="track-title">Radio Browser</div>
 
           <!-- Visualizer -->
-          <canvas class="visualizer" width="76" height="16"></canvas>
+          <canvas class="visualizer" width="100" height="24"></canvas>
 
           <!-- Volume Control -->
           <div class="volume-control">
@@ -707,7 +807,6 @@ class WinampRadioCard extends HTMLElement {
             <button class="control-btn btn-pause" onclick="this.getRootNode().host.togglePlay()" title="Pause"></button>
             <button class="control-btn btn-stop" onclick="this.getRootNode().host.stop()" title="Stop"></button>
             <button class="control-btn btn-next" title="Next"></button>
-            <button class="control-btn btn-eject eject" title="Eject"></button>
           </div>
         </div>
 
@@ -755,6 +854,6 @@ customElements.define('winamp-radio-card', WinampRadioCard);
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'winamp-radio-card',
-  name: 'Winamp Radio Card',
-  description: 'Authentic Winamp base-2.91 radio player using real BMP sprite graphics'
+  name: 'Radio Browser Card',
+  description: 'Modern radio player card for Home Assistant with gradient design and smooth controls'
 });

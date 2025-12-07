@@ -1,29 +1,23 @@
-# 📻 Winamp Radio Card
+# 📻 Radio Browser Card
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
 [![GitHub release](https://img.shields.io/github/release/joshuaaaaa/HA---Radio-card.svg)](https://github.com/joshuaaaaa/HA---Radio-card/releases)
 [![License](https://img.shields.io/github/license/joshuaaaaa/HA---Radio-card.svg)](LICENSE)
 
-A nostalgic **Winamp-style radio player** for Home Assistant! Browse and play internet radio stations with the iconic Winamp interface - complete with green LED display, playlist editor, and classic controls.
-
-<img width="293" height="348" alt="image" src="https://github.com/user-attachments/assets/39aabd0a-1a70-434d-91bf-c078a5ddaf24" />
-
-
+A modern **radio player card** for Home Assistant! Browse and play internet radio stations with a sleek gradient design - complete with animated visualizer, playlist editor, and smooth controls.
 
 ## ✨ Features
 
-- 🎮 **Classic Winamp Design** - Authentic Winamp 2.x interface with pixel-perfect styling
-- 💚 **Green LED Display** - Iconic glowing green digital display
-- 📊 **Visualizer** - Animated audio visualizer bars
+- 🎨 **Modern Gradient Design** - Beautiful purple gradient with glass morphism effects
+- 📊 **Animated Visualizer** - Smooth gradient audio visualizer bars
 - 🎛️ **Full Controls** - Previous, Play, Pause, Stop, Next buttons
-- 📋 **Playlist Editor** - Classic Winamp playlist window with station list
-- 🔊 **Volume Slider** - Vertical volume control slider (golden/orange gradient)
+- 📋 **Playlist Editor** - Modern playlist window with station list
+- 🔊 **Volume Slider** - Horizontal volume control slider
 - 📻 **Radio Browser Integration** - Browse and play thousands of internet radio stations
 - 🌍 **Country Filter** - Filter stations by country to avoid loading 43k+ stations at once
-- 🖱️ **Click to Play** - Click any station in the playlist to start playing
+- 🖱️ **Click to Play** - Double-click any station in the playlist to start playing
 - ⌨️ **Next/Previous** - Navigate through stations with arrow buttons
-- 🎨 **Metallic UI** - Classic silver/gray Winamp aesthetic
-- 💫 **Nostalgic Experience** - "It really whips the llama's ass!"
+- 💫 **Smooth Animations** - Hover effects and transitions throughout
 
 ## 📋 Requirements
 
@@ -42,29 +36,16 @@ A nostalgic **Winamp-style radio player** for Home Assistant! Browse and play in
 5. Add repository URL: `https://github.com/joshuaaaaa/HA---Radio-card`
 6. Select category: **Dashboard**
 7. Click **Add**
-8. Find **Winamp Radio Card** in the list
+8. Find **Radio Browser Card** in the list
 9. Click **Download**
-10. **Copy Winamp skin files:**
-    - Navigate to `config/custom_components/winamp-radio-card/` (or wherever HACS installed it)
-    - Copy the `winamp-skin` folder to `config/www/`
-    - Final path should be: `config/www/winamp-skin/`
-11. **Restart Home Assistant**
-12. Clear browser cache (Ctrl+F5)
-
-> **Note:** HACS cannot automatically copy files to the `www` folder, so you must manually copy the `winamp-skin` folder containing the authentic Winamp BMP graphics.
+10. **Restart Home Assistant**
+11. Clear browser cache (Ctrl+F5)
 
 ### Manual Installation
 
-1. Download `winamp-radio-card.js` and the `winamp-skin` folder from the [latest release](https://github.com/joshuaaaaa/HA---Radio-card/releases)
+1. Download `winamp-radio-card.js` from the [latest release](https://github.com/joshuaaaaa/HA---Radio-card/releases)
 2. Copy `winamp-radio-card.js` to your `config/www` folder
-3. Copy the `winamp-skin` folder to your `config/www` folder
-   - Final structure:
-     - `config/www/winamp-radio-card.js`
-     - `config/www/winamp-skin/MAIN.BMP`
-     - `config/www/winamp-skin/PLEDIT.BMP`
-     - `config/www/winamp-skin/CBUTTONS.BMP`
-     - etc.
-4. Add to your `configuration.yaml`:
+3. Add to your `configuration.yaml`:
 
 ```yaml
 lovelace:
@@ -82,14 +63,14 @@ lovelace:
 
 ```yaml
 type: custom:winamp-radio-card
-name: Winamp Radio
+name: Radio Browser
 ```
 
 ### With Pre-selected Media Player
 
 ```yaml
 type: custom:winamp-radio-card
-name: My Winamp
+name: My Radio
 entity: media_player.living_room_speaker
 ```
 
@@ -97,7 +78,7 @@ entity: media_player.living_room_speaker
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `name` | string | `"Winamp Radio"` | Display name in titlebar |
+| `name` | string | `"Radio Browser"` | Display name shown in the card |
 | `entity` | string | optional | Pre-select a media player (can be changed in UI) |
 
 ## 📖 How to Use
@@ -134,28 +115,28 @@ Click anywhere on the vertical Volume slider to set the volume level.
 
 ### Main Window
 
-- **Titlebar** - Blue Windows 95-style titlebar with minimize/maximize/close buttons
-- **LED Display** - Green glowing digital display showing time and station info
-- **Bitrate/KHz** - Shows stream quality information
-- **Visualizer** - Animated bars that pulse with the music
-- **Control Buttons** - Classic Winamp button styling with 3D effects
-- **Sliders** - Volume and Balance vertical sliders
+- **Modern Gradient** - Purple gradient background (`#667eea` → `#764ba2`)
+- **Glass Morphism** - Translucent elements with backdrop blur effects
+- **Title Display** - Clean white text showing station name
+- **Visualizer** - Animated gradient bars that respond to playback
+- **Control Buttons** - Circular buttons with smooth hover animations
+- **Volume Slider** - Modern rounded slider with smooth transitions
 
 ### Playlist Editor Window
 
-- **Station List** - All radio stations displayed with numbers
-- **Current Playing** - Highlighted in yellow
-- **Scrollbar** - Classic Windows 95-style scrollbar
-- **Controls** - ADD, REM, SEL, MISC, LIST buttons (classic Winamp layout)
-- **Info Bar** - Shows total number of stations
+- **Station List** - All radio stations with smooth hover effects
+- **Current Playing** - Highlighted with increased opacity
+- **Scrollbar** - Modern minimal scrollbar design
+- **Dropdown Selects** - Player and country selection with glass morphism
+- **Smooth Interactions** - All elements feature smooth transitions
 
 ### Color Scheme
 
-- **Background**: Silver/gray metallic gradient (`#C0C0C0`)
-- **Display Background**: Black (`#0A0A0A`)
-- **Display Text**: Green (`#00FF00`)
-- **Current Station**: Yellow (`#FFFF00`)
-- **Titlebar**: Blue gradient (`#3366FF` → `#000080`)
+- **Primary Gradient**: Purple (`#667eea` → `#764ba2`)
+- **Text**: White with various opacity levels
+- **Accent**: White overlays with transparency
+- **Current Station**: White with 25% opacity background
+- **Glass Effects**: Backdrop blur with semi-transparent backgrounds
 
 ## 🎯 Examples
 
@@ -163,28 +144,28 @@ Click anywhere on the vertical Volume slider to set the volume level.
 
 ```yaml
 type: custom:winamp-radio-card
-name: Winamp
+name: Radio Player
 ```
 
 ### Living Room Radio
 
 ```yaml
 type: custom:winamp-radio-card
-name: Living Room Winamp
+name: Living Room Radio
 entity: media_player.living_room
 ```
 
-### Multiple Winamp Players
+### Multiple Radio Players
 
 ```yaml
 # Kitchen
 type: custom:winamp-radio-card
-name: Kitchen Winamp
+name: Kitchen Radio
 entity: media_player.kitchen
 
 # Bedroom
 type: custom:winamp-radio-card
-name: Bedroom Winamp
+name: Bedroom Radio
 entity: media_player.bedroom
 ```
 
@@ -223,21 +204,14 @@ Works with any media player supporting URL streaming:
 3. Try a different station
 4. Check Home Assistant logs for errors
 
-## 🎨 Design Inspiration
-
-This card is a faithful recreation of the legendary **Winamp media player**:
-- [Winamp Skin Museum](https://skins.webamp.org/) - Classic Winamp skins
-- [WinampHeritage.com](https://winampheritage.com/skins) - Winamp skin archives
-- [Winamp Wikipedia](https://en.wikipedia.org/wiki/Winamp) - History and design
-
 ## 📚 Technical Details
 
 ### How It Works
 
 **Loading Stations:**
-- Browses all Radio Browser categories
-- Loads all playable stations into memory
-- Displays them in the playlist without filtering
+- Uses Home Assistant's Radio Browser integration
+- Browses stations by country to optimize loading
+- Displays filtered stations in the playlist
 
 **Playback:**
 ```javascript
@@ -250,18 +224,12 @@ hass.callService('media_player', 'play_media', {
 
 ### Key Features
 
-- **Authentic Winamp Styling** - CSS gradients, inset/outset borders, 3D effects
-- **LED Display** - Green monospace font with text-shadow glow
-- **Playlist Management** - Click to play, current track highlighting
-- **Volume Control** - Click-to-set vertical slider
-- **Animated Visualizer** - CSS animations for audio bars
-
-## 🕹️ Easter Eggs
-
-- The visualizer animates even when paused (just like Winamp!)
-- Titlebar buttons are functional (but don't minimize the actual window)
-- Classic "Winamp Playlist Editor" title
-- Green LED display with authentic glow effect
+- **Modern CSS Design** - Pure CSS with gradients, backdrop filters, and smooth transitions
+- **No External Dependencies** - All styling is self-contained, no external images required
+- **Glass Morphism** - Modern translucent effects with backdrop blur
+- **Playlist Management** - Click to select, double-click to play
+- **Volume Control** - Smooth horizontal slider with gradient thumb
+- **Animated Visualizer** - Canvas-based gradient bars that respond to playback
 
 ## 🤝 Contributing
 
@@ -279,10 +247,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- Inspired by the legendary **Winamp** media player by Nullsoft
 - Built for the Home Assistant community
-- "Winamp, it really whips the llama's ass!"
 - Uses the Radio Browser integration for station data
+- Modern design inspired by contemporary UI/UX trends
 
 ## Support
 
@@ -290,13 +257,10 @@ If you like this card, please ⭐ star this repository!
 
 Found a bug or have a feature request? Please open an issue.
 
-
-
 ## http://buymeacoffee.com/jakubhruby
-
 
 <img width="150" height="150" alt="qr-code" src="https://github.com/user-attachments/assets/2581bf36-7f7d-4745-b792-d1abaca6e57d" />
 
 ---
 
-🎵 **It really whips the llama's ass!** 🦙
+🎵 **Enjoy your music!** 📻
