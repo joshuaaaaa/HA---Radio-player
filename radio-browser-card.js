@@ -384,13 +384,13 @@ class RadioBrowserCard extends HTMLElement {
     if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
-    const bars = 16;
+    const bars = 20;
     const barWidth = Math.floor(canvas.width / bars);
     const heights = new Array(bars).fill(0);
 
     this._visualizerInterval = setInterval(() => {
-      // Clear with black background
-      ctx.fillStyle = '#000000';
+      // Clear with dark background
+      ctx.fillStyle = '#181818';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       for (let i = 0; i < bars; i++) {
@@ -401,9 +401,9 @@ class RadioBrowserCard extends HTMLElement {
         const x = i * barWidth;
         const y = canvas.height - barHeight;
 
-        // Draw retro green bars
-        ctx.fillStyle = '#00FF00';
-        ctx.fillRect(x, y, barWidth - 1, barHeight);
+        // Draw modern Spotify green bars
+        ctx.fillStyle = '#1DB954';
+        ctx.fillRect(x + 1, y, barWidth - 2, barHeight);
       }
     }, 50); // 20 FPS
   }
@@ -413,11 +413,11 @@ class RadioBrowserCard extends HTMLElement {
       clearInterval(this._visualizerInterval);
       this._visualizerInterval = null;
 
-      // Clear canvas with black background
+      // Clear canvas with dark background
       const canvas = this.shadowRoot.querySelector('.visualizer');
       if (canvas) {
         const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#000000';
+        ctx.fillStyle = '#181818';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
     }
@@ -448,78 +448,60 @@ class RadioBrowserCard extends HTMLElement {
           position: relative;
         }
 
-        /* Main Window - Retro metallic design */
+        /* Main Window - Modern dark minimalist design */
         .main-window {
           width: 275px;
           height: 116px;
-          background: linear-gradient(180deg, #525252 0%, #3a3a3a 100%);
-          border: 1px solid #1a1a1a;
-          box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.1),
-                      inset -1px -1px 0 rgba(0, 0, 0, 0.5),
-                      0 2px 4px rgba(0, 0, 0, 0.5);
+          background: #121212;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
           position: relative;
-        }
-
-        /* Retro titlebar */
-        .titlebar {
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          height: 14px;
-          background: linear-gradient(180deg, #3366CC 0%, #0033AA 100%);
-          border-bottom: 1px solid #000;
+          overflow: hidden;
         }
 
         .track-title {
           position: absolute;
-          top: 27px;
-          left: 112px;
-          width: 152px;
-          height: 12px;
-          background: #000000;
-          border: 1px solid #2a2a2a;
-          box-shadow: inset -1px -1px 0 rgba(255, 255, 255, 0.1);
-          color: #00FF00;
-          font-size: 8px;
-          font-family: 'Courier New', monospace;
-          font-weight: bold;
+          top: 12px;
+          left: 12px;
+          right: 12px;
+          height: 18px;
+          color: #ffffff;
+          font-size: 11px;
+          font-weight: 600;
           overflow: hidden;
           white-space: nowrap;
           text-overflow: ellipsis;
-          text-shadow: 0 0 3px #00FF00;
-          line-height: 12px;
-          padding: 0 2px;
+          line-height: 18px;
           z-index: 1;
         }
 
         /* Visualizer */
         .visualizer {
           position: absolute;
-          top: 43px;
-          left: 24px;
-          width: 76px;
-          height: 16px;
-          background: #000000;
-          border: 1px solid #2a2a2a;
-          box-shadow: inset -1px -1px 0 rgba(255, 255, 255, 0.1);
+          top: 38px;
+          left: 12px;
+          width: 80px;
+          height: 32px;
+          background: #181818;
+          border-radius: 4px;
         }
 
         /* Volume control */
         .volume-control {
           position: absolute;
-          top: 57px;
-          left: 107px;
-          width: 68px;
-          height: 13px;
+          top: 78px;
+          left: 12px;
+          right: 12px;
+          height: 26px;
           background: transparent;
           display: flex;
           align-items: center;
+          gap: 8px;
         }
 
         .volume-slider {
           width: 100%;
-          height: 10px;
+          height: 4px;
           -webkit-appearance: none;
           background: transparent;
           outline: none;
@@ -527,69 +509,73 @@ class RadioBrowserCard extends HTMLElement {
 
         .volume-slider::-webkit-slider-track {
           width: 100%;
-          height: 10px;
-          background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 50%, #1a1a1a 100%);
-          border: 1px solid #2a2a2a;
-          box-shadow: inset -1px -1px 0 rgba(255, 255, 255, 0.1);
+          height: 4px;
+          background: #535353;
+          border-radius: 2px;
         }
 
         .volume-slider::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
           width: 12px;
-          height: 10px;
-          background: linear-gradient(180deg, #666 0%, #444 100%);
+          height: 12px;
+          background: #1DB954;
           cursor: pointer;
-          border: 1px solid #222;
-          box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.3);
+          border-radius: 50%;
+          transition: transform 0.2s;
+        }
+
+        .volume-slider::-webkit-slider-thumb:hover {
+          transform: scale(1.2);
         }
 
         .volume-slider::-moz-range-track {
           width: 100%;
-          height: 10px;
-          background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 50%, #1a1a1a 100%);
-          border: 1px solid #2a2a2a;
+          height: 4px;
+          background: #535353;
+          border-radius: 2px;
         }
 
         .volume-slider::-moz-range-thumb {
           width: 12px;
-          height: 10px;
-          background: linear-gradient(180deg, #666 0%, #444 100%);
+          height: 12px;
+          background: #1DB954;
           cursor: pointer;
-          border: 1px solid #222;
+          border-radius: 50%;
+          border: none;
         }
 
-        /* Control buttons - Retro 3D style */
+        /* Control buttons - Modern minimalist style */
         .control-buttons {
           position: absolute;
-          top: 88px;
-          left: 16px;
+          top: 38px;
+          right: 12px;
           display: flex;
-          gap: 0;
+          gap: 4px;
+          align-items: center;
         }
 
         .control-btn {
-          width: 23px;
-          height: 18px;
-          background: linear-gradient(180deg, #5a5a5a 0%, #3a3a3a 100%);
-          border: 1px solid #1a1a1a;
-          box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.3),
-                      inset -1px -1px 0 rgba(0, 0, 0, 0.5);
+          width: 32px;
+          height: 32px;
+          background: #282828;
+          border-radius: 50%;
+          border: none;
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
           position: relative;
+          transition: all 0.2s;
         }
 
         .control-btn:hover {
-          background: linear-gradient(180deg, #6a6a6a 0%, #4a4a4a 100%);
+          background: #333333;
+          transform: scale(1.05);
         }
 
         .control-btn:active {
-          box-shadow: inset -1px -1px 0 rgba(255, 255, 255, 0.3),
-                      inset 1px 1px 0 rgba(0, 0, 0, 0.5);
-          background: linear-gradient(180deg, #3a3a3a 0%, #5a5a5a 100%);
+          transform: scale(0.95);
         }
 
         /* Button icons using CSS */
@@ -601,8 +587,8 @@ class RadioBrowserCard extends HTMLElement {
         }
 
         .btn-prev::before {
-          border-width: 5px 8px 5px 0;
-          border-color: transparent #00FF00 transparent transparent;
+          border-width: 5px 7px 5px 0;
+          border-color: transparent #b3b3b3 transparent transparent;
           margin-right: -1px;
         }
 
@@ -611,35 +597,44 @@ class RadioBrowserCard extends HTMLElement {
           position: absolute;
           width: 2px;
           height: 10px;
-          background: #00FF00;
-          left: 6px;
+          background: #b3b3b3;
+          left: 11px;
+        }
+
+        .btn-play {
+          background: #1DB954;
+        }
+
+        .btn-play:hover {
+          background: #1ed760;
         }
 
         .btn-play::before {
           border-width: 6px 0 6px 10px;
-          border-color: transparent transparent transparent #00FF00;
+          border-color: transparent transparent transparent #ffffff;
           margin-left: 2px;
         }
 
         .btn-pause::before {
           content: '';
           width: 3px;
-          height: 10px;
-          background: #00FF00;
-          box-shadow: 5px 0 0 #00FF00;
+          height: 12px;
+          background: #b3b3b3;
+          box-shadow: 5px 0 0 #b3b3b3;
         }
 
         .btn-stop::before {
           content: '';
           width: 10px;
           height: 10px;
-          background: #00FF00;
+          background: #b3b3b3;
+          border-radius: 1px;
         }
 
         .btn-next::before {
-          border-width: 5px 0 5px 8px;
-          border-color: transparent transparent transparent #00FF00;
-          margin-left: 2px;
+          border-width: 5px 0 5px 7px;
+          border-color: transparent transparent transparent #b3b3b3;
+          margin-left: 1px;
         }
 
         .btn-next::after {
@@ -647,64 +642,61 @@ class RadioBrowserCard extends HTMLElement {
           position: absolute;
           width: 2px;
           height: 10px;
-          background: #00FF00;
-          right: 6px;
+          background: #b3b3b3;
+          right: 11px;
         }
 
-        /* Playlist Window - Retro design */
+        /* Playlist Window - Modern minimalist design */
         .playlist-window {
           width: 275px;
-          background: linear-gradient(180deg, #525252 0%, #3a3a3a 100%);
-          border: 1px solid #1a1a1a;
-          box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.1),
-                      inset -1px -1px 0 rgba(0, 0, 0, 0.5),
-                      0 2px 4px rgba(0, 0, 0, 0.5);
+          background: #121212;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
           position: relative;
-          margin-top: 2px;
+          margin-top: 8px;
+          overflow: hidden;
         }
 
         /* Search controls at top */
         .playlist-controls {
-          padding: 8px;
-          background: transparent;
-          border-bottom: 1px solid #1a1a1a;
+          padding: 12px;
+          background: #181818;
         }
 
         .player-select, .country-select {
           width: 100%;
-          height: 22px;
-          background: #000000;
-          color: #00FF00;
-          border: 1px solid #2a2a2a;
-          box-shadow: inset -1px -1px 0 rgba(255, 255, 255, 0.1);
-          font-size: 10px;
-          font-family: Arial, sans-serif;
-          padding: 2px 4px;
-          margin-bottom: 4px;
+          height: 36px;
+          background: #282828;
+          color: #ffffff;
+          border: none;
+          border-radius: 4px;
+          font-size: 12px;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          padding: 8px 12px;
+          margin-bottom: 8px;
           cursor: pointer;
+          transition: background 0.2s;
         }
 
         .player-select:hover, .country-select:hover {
-          background: #0a0a0a;
+          background: #333333;
         }
 
         .player-select:focus, .country-select:focus {
-          outline: none;
-          border-color: #00FF00;
+          outline: 2px solid #1DB954;
+          outline-offset: -2px;
         }
 
         .player-select option, .country-select option {
-          background: #000000;
-          color: #00FF00;
+          background: #282828;
+          color: #ffffff;
         }
 
         /* Playlist body */
         .playlist-body {
           height: 150px;
-          background: #000000;
+          background: #121212;
           position: relative;
-          border: 1px solid #2a2a2a;
-          box-shadow: inset -1px -1px 0 rgba(255, 255, 255, 0.1);
         }
 
         /* Playlist area */
@@ -720,79 +712,78 @@ class RadioBrowserCard extends HTMLElement {
         }
 
         .playlist-display::-webkit-scrollbar {
-          width: 6px;
+          width: 8px;
         }
 
         .playlist-display::-webkit-scrollbar-track {
-          background: #000000;
+          background: #121212;
         }
 
         .playlist-display::-webkit-scrollbar-thumb {
-          background: #2a2a2a;
+          background: #282828;
+          border-radius: 4px;
         }
 
         .playlist-display::-webkit-scrollbar-thumb:hover {
-          background: #3a3a3a;
+          background: #333333;
         }
 
         .playlist-items {
-          padding: 2px;
+          padding: 4px;
         }
 
-        /* Retro playlist item styling */
+        /* Modern playlist item styling */
         .playlist-item {
-          color: #00FF00;
+          color: #b3b3b3;
           background: transparent;
-          font-size: 10px;
-          font-family: Arial, sans-serif;
-          padding: 2px 4px;
+          font-size: 11px;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          padding: 8px 12px;
           cursor: pointer;
           display: flex;
-          gap: 4px;
+          gap: 8px;
           white-space: nowrap;
+          border-radius: 4px;
+          margin-bottom: 2px;
+          transition: all 0.2s;
         }
 
         .playlist-item:hover {
-          background: #0a0a0a;
+          background: #282828;
+          color: #ffffff;
         }
 
         .playlist-item.selected {
-          background: #1a1a1a;
+          background: #282828;
+          color: #ffffff;
         }
 
         .playlist-item.current {
-          color: #FFFFFF;
-          background: #3366CC;
+          color: #1DB954;
+          background: #181818;
         }
 
         .item-number {
-          color: inherit;
-          min-width: 20px;
+          color: #535353;
+          min-width: 24px;
+          font-size: 10px;
         }
 
         .item-title {
           flex: 1;
           overflow: hidden;
           text-overflow: ellipsis;
+          color: inherit;
         }
       </style>
 
       <div class="winamp-container">
         <!-- Main Player Window -->
         <div class="main-window">
-          <!-- Retro titlebar -->
-          <div class="titlebar"></div>
-
           <div class="track-title">Radio Browser</div>
 
           <!-- Visualizer -->
-          <canvas class="visualizer" width="76" height="16"></canvas>
-
-          <!-- Volume Control -->
-          <div class="volume-control">
-            <input type="range" class="volume-slider" min="0" max="100" value="15"
-                   oninput="this.getRootNode().host.handleVolumeChange(event)">
-          </div>
+          <canvas class="visualizer" width="80" height="32"></canvas>
 
           <!-- Control Buttons -->
           <div class="control-buttons">
@@ -801,6 +792,12 @@ class RadioBrowserCard extends HTMLElement {
             <button class="control-btn btn-pause" onclick="this.getRootNode().host.togglePlay()" title="Pause"></button>
             <button class="control-btn btn-stop" onclick="this.getRootNode().host.stop()" title="Stop"></button>
             <button class="control-btn btn-next" title="Next"></button>
+          </div>
+
+          <!-- Volume Control -->
+          <div class="volume-control">
+            <input type="range" class="volume-slider" min="0" max="100" value="15"
+                   oninput="this.getRootNode().host.handleVolumeChange(event)">
           </div>
         </div>
 

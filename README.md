@@ -4,20 +4,20 @@
 [![GitHub release](https://img.shields.io/github/release/joshuaaaaa/HA---Radio-card.svg)](https://github.com/joshuaaaaa/HA---Radio-card/releases)
 [![License](https://img.shields.io/github/license/joshuaaaaa/HA---Radio-card.svg)](LICENSE)
 
-A modern **radio player card** for Home Assistant! Browse and play internet radio stations with a sleek gradient design - complete with animated visualizer, playlist editor, and smooth controls.
+A modern **radio player card** for Home Assistant! Browse and play internet radio stations with a sleek dark theme design inspired by popular music streaming services - complete with animated visualizer, playlist editor, and smooth controls.
 
 ## ✨ Features
 
-- 🎨 **Modern Gradient Design** - Beautiful purple gradient with glass morphism effects
-- 📊 **Animated Visualizer** - Smooth gradient audio visualizer bars
-- 🎛️ **Full Controls** - Previous, Play, Pause, Stop, Next buttons
-- 📋 **Playlist Editor** - Modern playlist window with station list
-- 🔊 **Volume Slider** - Horizontal volume control slider
+- 🎨 **Modern Dark Design** - Minimalist dark theme (#121212) inspired by Spotify's design language
+- 📊 **Animated Visualizer** - Smooth green (#1DB954) audio visualizer bars
+- 🎛️ **Full Controls** - Circular buttons with Previous, Play, Pause, Stop, Next
+- 📋 **Playlist Editor** - Clean playlist window with smooth hover effects
+- 🔊 **Volume Slider** - Modern horizontal slider with green accent
 - 📻 **Radio Browser Integration** - Browse and play thousands of internet radio stations
 - 🌍 **Country Filter** - Filter stations by country to avoid loading 43k+ stations at once
 - 🖱️ **Click to Play** - Double-click any station in the playlist to start playing
 - ⌨️ **Next/Previous** - Navigate through stations with arrow buttons
-- 💫 **Smooth Animations** - Hover effects and transitions throughout
+- 💫 **Smooth Animations** - Hover effects, scale transforms, and transitions throughout
 
 ## 📋 Requirements
 
@@ -115,28 +115,30 @@ Click anywhere on the vertical Volume slider to set the volume level.
 
 ### Main Window
 
-- **Modern Gradient** - Purple gradient background (`#667eea` → `#764ba2`)
-- **Glass Morphism** - Translucent elements with backdrop blur effects
-- **Title Display** - Clean white text showing station name
-- **Visualizer** - Animated gradient bars that respond to playback
-- **Control Buttons** - Circular buttons with smooth hover animations
-- **Volume Slider** - Modern rounded slider with smooth transitions
+- **Dark Background** - Pure dark theme (#121212) for reduced eye strain
+- **Rounded Corners** - Modern 8px border radius for smooth aesthetics
+- **Title Display** - Clean white text (600 weight) showing station name
+- **Visualizer** - Animated Spotify green (#1DB954) bars on dark background (#181818)
+- **Control Buttons** - Circular buttons (#282828) with hover states and scale animations
+- **Play Button** - Prominent green accent (#1DB954) for primary action
+- **Volume Slider** - Sleek slider with green thumb (#1DB954) and smooth transitions
 
 ### Playlist Editor Window
 
-- **Station List** - All radio stations with smooth hover effects
-- **Current Playing** - Highlighted with increased opacity
-- **Scrollbar** - Modern minimal scrollbar design
-- **Dropdown Selects** - Player and country selection with glass morphism
-- **Smooth Interactions** - All elements feature smooth transitions
+- **Station List** - All radio stations with modern card-style hover effects (#282828)
+- **Current Playing** - Highlighted with Spotify green (#1DB954)
+- **Scrollbar** - Minimal dark scrollbar (#282828) with rounded design
+- **Dropdown Selects** - Modern rounded selects (#282828) with green focus outline
+- **Smooth Interactions** - All elements feature 200ms transitions
 
 ### Color Scheme
 
-- **Primary Gradient**: Purple (`#667eea` → `#764ba2`)
-- **Text**: White with various opacity levels
-- **Accent**: White overlays with transparency
-- **Current Station**: White with 25% opacity background
-- **Glass Effects**: Backdrop blur with semi-transparent backgrounds
+- **Background**: Pure dark (#121212)
+- **Cards**: Dark gray (#181818, #282828)
+- **Text**: White (#ffffff) and gray (#b3b3b3)
+- **Accent**: Spotify green (#1DB954, #1ed760)
+- **Current Station**: Green text on dark background
+- **Design Inspiration**: Modern streaming services (open-source CSS implementation)
 
 ## 🎯 Examples
 
@@ -224,12 +226,13 @@ hass.callService('media_player', 'play_media', {
 
 ### Key Features
 
-- **Modern CSS Design** - Pure CSS with gradients, backdrop filters, and smooth transitions
+- **Modern CSS Design** - Pure CSS inspired by Spotify's design language with dark theme
 - **No External Dependencies** - All styling is self-contained, no external images required
-- **Glass Morphism** - Modern translucent effects with backdrop blur
+- **Minimalist Interface** - Clean, distraction-free UI with focus on content
 - **Playlist Management** - Click to select, double-click to play
-- **Volume Control** - Smooth horizontal slider with gradient thumb
-- **Animated Visualizer** - Canvas-based gradient bars that respond to playback
+- **Volume Control** - Smooth horizontal slider with green accent thumb (#1DB954)
+- **Animated Visualizer** - Canvas-based green bars (#1DB954) that respond to playback
+- **Open Source Design** - Based on freely available design patterns, no proprietary assets
 
 ## 🤝 Contributing
 
@@ -249,7 +252,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - Built for the Home Assistant community
 - Uses the Radio Browser integration for station data
-- Modern design inspired by contemporary UI/UX trends
+- Modern design inspired by Spotify and contemporary music streaming services
+- All design elements created using open-source CSS techniques
+- Color scheme references:
+  - [Spotify Clone Design Examples](https://github.com/CodeByAlmas/pure-html-css-spotify-clone)
+  - [Modern Music Player UI Patterns](https://dribbble.com/tags/dark_music_player)
 
 ## Support
 
