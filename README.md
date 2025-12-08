@@ -237,15 +237,7 @@ hass.callService('media_player', 'play_media', {
 - **Animated Visualizer** - Canvas-based green bars (#1DB954) that respond to playback
 - **Open Source Design** - Based on freely available design patterns, no proprietary assets
 
-## 🤝 Contributing
 
-Contributions are welcome!
-
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Open a Pull Request
 
 ## 📝 License
 
