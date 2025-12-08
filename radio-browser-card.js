@@ -35,7 +35,7 @@ class RadioBrowserCard extends HTMLElement {
       this.updateMediaPlayers();
     }
 
-    if (this._selectedMediaPlayer && this._countries.length === 0) {
+    if (this._selectedMediaPlayer) {
       this.loadCountries();
     }
 
