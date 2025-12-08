@@ -36,7 +36,7 @@ A modern **radio player card** for Home Assistant! Browse and play internet radi
 2. Click on **Frontend**
 3. Click the **⋮** (three dots) in the top right corner
 4. Select **Custom repositories**
-5. Add repository URL: `https://github.com/joshuaaaaa/HA---Radio-card`
+5. Add repository URL: `https://github.com/joshuaaaaa/HA---Radio-player`
 6. Select category: **Dashboard**
 7. Click **Add**
 8. Find **Radio Browser Card** in the list
