@@ -174,22 +174,7 @@ class RadioBrowserCard extends HTMLElement {
 
     try {
       const entity = this._hass.states[this._selectedMediaPlayer];
-
-      // Browser player needs special handling after stop
-      // Clear any previous media first if it was stopped or idle
       const isBrowserPlayer = entity && entity.entity_id && entity.entity_id.includes('browser');
-      if (isBrowserPlayer && (entity.state === 'idle' || entity.state === 'off')) {
-        console.log('Browser player detected in idle/off state, clearing before play');
-        try {
-          await this._hass.callService('media_player', 'clear_playlist', {
-            entity_id: this._selectedMediaPlayer
-          });
-          // Wait a bit for clear to complete
-          await new Promise(resolve => setTimeout(resolve, 300));
-        } catch (e) {
-          console.log('Clear playlist not supported, continuing anyway');
-        }
-      }
 
       // Set safe default volume (15%) before playing if volume is too high or not set
       if (entity && (entity.attributes.volume_level === undefined || entity.attributes.volume_level > 0.3)) {
