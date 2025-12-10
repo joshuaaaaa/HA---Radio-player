@@ -13,14 +13,18 @@ A modern **radio player card** for Home Assistant! Browse and play internet radi
 ## ✨ Features
 
 - 🎨 **Modern Dark Design** - Minimalist dark theme (#121212) inspired by Spotify's design language
-- 📊 **Animated Visualizer** - Smooth green (#1DB954) audio visualizer bars
+- 📊 **Animated Visualizer** - Smooth green (#1DB954) audio visualizer bars with multiple styles
 - 🎛️ **Full Controls** - Circular buttons with Previous, Play, Pause, Stop, Next
 - 📋 **Playlist Editor** - Clean playlist window with smooth hover effects
+- ⭐ **Favorites Management** - Save your favorite stations with a click
+- 🎨 **Theme Support** - Dark, Light, and Custom theme options
 - 🔊 **Volume Slider** - Modern horizontal slider with green accent
 - 📻 **Radio Browser Integration** - Browse and play thousands of internet radio stations
 - 🌍 **Country Filter** - Filter stations by country to avoid loading 43k+ stations at once
+- 🔍 **Search/Filter** - Real-time search to filter stations by name
 - 🖱️ **Click to Play** - Double-click any station in the playlist to start playing
-- ⌨️ **Next/Previous** - Navigate through stations with arrow buttons
+- ⏮️⏭️ **Previous/Next** - Navigate through stations with buttons or arrow keys (with looping)
+- ⌨️ **Keyboard Shortcuts** - Space (play/pause), arrows (prev/next/volume)
 - 💫 **Smooth Animations** - Hover effects, scale transforms, and transitions throughout
 
 ## 📋 Requirements
@@ -99,21 +103,44 @@ Choose a country from the dropdown to load stations. This filters the 43,000+ st
 
 Stations from the selected country will be loaded into the playlist.
 
-### 4. Play a Station
+### 4. Search Stations
 
-- **Click** any station in the playlist to start playing
-- Or use the **Play button** to play the current/first station
+Use the search box to filter stations by name in real-time:
+- Type in the search field to filter results
+- Clear the search to show all stations
 
-### 4. Navigate
+### 5. Play a Station
 
-- **⏭ Next** - Play next station in the list
-- **⏮ Previous** - Play previous station in the list
-- **⏸ Pause** - Pause playback
+- **Single-click** to select a station
+- **Double-click** to play the station
+- Or use the **Play button** to play the selected/first station
+
+### 6. Manage Favorites
+
+- **Click the ★ icon** next to any station to add it to favorites
+- **Click ★ again** to remove from favorites
+- When no country is selected, your **favorites list** is displayed
+- Navigate through favorites using Previous/Next buttons
+
+### 7. Navigate
+
+- **⏭ Next** - Play next station (button or → key)
+- **⏮ Previous** - Play previous station (button or ← key)
+- **▶ Play/Pause** - Toggle playback (button or Space key)
 - **⏹ Stop** - Stop playback
 
-### 5. Control Volume
+### 8. Control Volume
 
-Click anywhere on the vertical Volume slider to set the volume level.
+- Use the slider to adjust volume
+- Or use **↑/↓ arrow keys** for fine control
+
+### 9. Keyboard Shortcuts
+
+- **Space** - Play/Pause
+- **← Left Arrow** - Previous station
+- **→ Right Arrow** - Next station
+- **↑ Up Arrow** - Volume up (+5%)
+- **↓ Down Arrow** - Volume down (-5%)
 
 ## 🎨 Design Details
 
@@ -234,6 +261,9 @@ hass.callService('media_player', 'play_media', {
 - **No External Dependencies** - All styling is self-contained, no external images required
 - **Minimalist Interface** - Clean, distraction-free UI with focus on content
 - **Playlist Management** - Click to select, double-click to play
+- **Real-time Search** - Filter stations by name as you type
+- **Full Navigation** - Previous/Next buttons with keyboard support
+- **Keyboard Shortcuts** - Space, Arrow keys for complete control
 - **Volume Control** - Smooth horizontal slider with green accent thumb (#1DB954)
 - **Animated Visualizer** - Canvas-based green bars (#1DB954) that respond to playback
 - **Open Source Design** - Based on freely available design patterns, no proprietary assets
