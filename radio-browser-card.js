@@ -119,55 +119,18 @@ class RadioBrowserCard extends HTMLElement {
     }
   }
 
-  // Navigation with looping support
+  // Navigation
   async playPrevious() {
-    const filteredStations = this.getFilteredStations();
-    if (filteredStations.length === 0) return;
-
-    const sourceList = this._stations.length > 0 ? this._stations : this._favorites;
-    if (sourceList.length === 0) return;
-
-    let prevIndex = this._currentStationIndex - 1;
-    if (prevIndex < 0) {
-      prevIndex = sourceList.length - 1; // Loop to end
-    }
-
-    // Find previous station in filtered list
-    let attempts = 0;
-    while (attempts < sourceList.length) {
-      const station = sourceList[prevIndex];
-      if (!this._searchQuery || station.title.toLowerCase().includes(this._searchQuery)) {
-        await this.playStation(station, prevIndex);
-        return;
-      }
-      prevIndex = prevIndex - 1;
-      if (prevIndex < 0) prevIndex = sourceList.length - 1;
-      attempts++;
+    if (this._currentStationIndex > 0) {
+      const newIndex = this._currentStationIndex - 1;
+      await this.playStation(this._stations[newIndex], newIndex);
     }
   }
 
   async playNext() {
-    const filteredStations = this.getFilteredStations();
-    if (filteredStations.length === 0) return;
-
-    const sourceList = this._stations.length > 0 ? this._stations : this._favorites;
-    if (sourceList.length === 0) return;
-
-    let nextIndex = this._currentStationIndex + 1;
-    if (nextIndex >= sourceList.length) {
-      nextIndex = 0; // Loop to beginning
-    }
-
-    // Find next station in filtered list
-    let attempts = 0;
-    while (attempts < sourceList.length) {
-      const station = sourceList[nextIndex];
-      if (!this._searchQuery || station.title.toLowerCase().includes(this._searchQuery)) {
-        await this.playStation(station, nextIndex);
-        return;
-      }
-      nextIndex = (nextIndex + 1) % sourceList.length;
-      attempts++;
+    if (this._currentStationIndex < this._stations.length - 1) {
+      const newIndex = this._currentStationIndex + 1;
+      await this.playStation(this._stations[newIndex], newIndex);
     }
   }
 

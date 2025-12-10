@@ -6,6 +6,10 @@
 
 A modern **radio player card** for Home Assistant! Browse and play internet radio stations with a sleek dark theme design inspired by popular music streaming services - complete with animated visualizer, playlist editor, and smooth controls.
 
+<img width="428" height="499" alt="image" src="https://github.com/user-attachments/assets/0028e648-3416-4674-8a7b-54e9c3712aad" />
+
+
+
 ## ✨ Features
 
 - 🎨 **Modern Dark Design** - Minimalist dark theme (#121212) inspired by Spotify's design language
@@ -37,7 +41,7 @@ A modern **radio player card** for Home Assistant! Browse and play internet radi
 2. Click on **Frontend**
 3. Click the **⋮** (three dots) in the top right corner
 4. Select **Custom repositories**
-5. Add repository URL: `https://github.com/joshuaaaaa/HA---Radio-card`
+5. Add repository URL: `https://github.com/joshuaaaaa/HA---Radio-player`
 6. Select category: **Dashboard**
 7. Click **Add**
 8. Find **Radio Browser Card** in the list
@@ -264,15 +268,7 @@ hass.callService('media_player', 'play_media', {
 - **Animated Visualizer** - Canvas-based green bars (#1DB954) that respond to playback
 - **Open Source Design** - Based on freely available design patterns, no proprietary assets
 
-## 🤝 Contributing
 
-Contributions are welcome!
-
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Open a Pull Request
 
 ## 📝 License
 
