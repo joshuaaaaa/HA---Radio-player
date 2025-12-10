@@ -1690,6 +1690,15 @@ class RadioBrowserCard extends HTMLElement {
     if (this._hass && this._selectedMediaPlayer) {
       this.updateDisplay();
     }
+
+    // Initialize volume slider gradient on render
+    setTimeout(() => {
+      const volumeSlider = this.shadowRoot.querySelector('.volume-slider');
+      if (volumeSlider) {
+        const volumeValue = parseInt(volumeSlider.value) || 10;
+        volumeSlider.style.setProperty('--volume-percent', volumeValue + '%');
+      }
+    }, 0);
   }
 
   toggleSettings(e) {
