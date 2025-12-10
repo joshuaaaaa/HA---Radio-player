@@ -6,7 +6,8 @@
 
 A modern **radio player card** for Home Assistant! Browse and play internet radio stations with a sleek dark theme design inspired by popular music streaming services - complete with animated visualizer, playlist editor, and smooth controls.
 
-<img width="428" height="499" alt="image" src="https://github.com/user-attachments/assets/0028e648-3416-4674-8a7b-54e9c3712aad" />
+<img width="421" height="512" alt="image" src="https://github.com/user-attachments/assets/c9bb5118-6fb3-4447-857b-50838c0321f3" />
+
 
 
 
