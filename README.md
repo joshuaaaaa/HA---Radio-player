@@ -17,14 +17,19 @@ A modern **radio player card** for Home Assistant! Browse and play internet radi
 - 🎛️ **Full Controls** - Circular buttons with Previous, Play, Pause, Stop, Next
 - 📋 **Playlist Editor** - Clean playlist window with smooth hover effects
 - ⭐ **Favorites Management** - Save your favorite stations with a click
+- 📤 **Export/Import Favorites** - Backup and restore your favorite stations as JSON
 - 🎨 **Theme Support** - Dark, Light, and Custom theme options
 - 🔊 **Volume Slider** - Modern horizontal slider with green accent
+- 🔇 **Mute Button** - Quick mute/unmute toggle
 - 📻 **Radio Browser Integration** - Browse and play thousands of internet radio stations
 - 🌍 **Country Filter** - Filter stations by country to avoid loading 43k+ stations at once
+- 📊 **Station Metadata** - Display bitrate, codec, and country info while playing
 - 🔍 **Search/Filter** - Real-time search to filter stations by name
 - 🖱️ **Click to Play** - Double-click any station in the playlist to start playing
 - ⏮️⏭️ **Previous/Next** - Navigate through stations with buttons or arrow keys (with looping)
 - ⌨️ **Keyboard Shortcuts** - Space (play/pause), arrows (prev/next/volume)
+- ⏲️ **Sleep Timer** - Auto-stop playback after 15, 30, or 60 minutes
+- 💾 **State Persistence** - Survives page reloads without losing your selection
 - 💫 **Smooth Animations** - Hover effects, scale transforms, and transitions throughout
 
 ## 📋 Requirements
@@ -141,6 +146,34 @@ Use the search box to filter stations by name in real-time:
 - **→ Right Arrow** - Next station
 - **↑ Up Arrow** - Volume up (+5%)
 - **↓ Down Arrow** - Volume down (-5%)
+
+### 10. Quick Mute
+
+- **Click the 🔊 button** in the top-right to mute/unmute
+- Icon changes to 🔇 when muted
+- Restores previous volume when unmuted
+
+### 11. Sleep Timer
+
+- **Click the ⏲️ button** in the top-right
+- Select **15, 30, or 60 minutes**
+- Timer countdown displays in top-right corner
+- Playback stops automatically when timer expires
+- Click **Off** to cancel the timer
+
+### 12. Export/Import Favorites
+
+- **Open Settings** (⚙️ button)
+- **Export**: Click 📤 Export to download JSON file
+- **Import**: Click 📥 Import to restore from JSON file
+- Share favorites between devices or create backups
+
+### 13. Station Information
+
+While playing, you'll see station metadata below the title:
+- 📍 **Country** - Station's country of origin
+- 🎵 **Codec** - Audio format (MP3, AAC, OGG, FLAC)
+- 📊 **Bitrate** - Stream quality in kbps
 
 ## 🎨 Design Details
 
