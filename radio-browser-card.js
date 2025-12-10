@@ -17,6 +17,15 @@ class RadioBrowserCard extends HTMLElement {
     this._visualizerStyle = localStorage.getItem('radio_visualizer_style') || 'bars';
     this._theme = localStorage.getItem('radio_theme') || 'dark';
     this._keyboardHandler = null;
+    this._isMuted = false;
+    this._volumeBeforeMute = 50;
+    this._sleepTimer = null;
+    this._sleepTimerInterval = null;
+    this._sleepTimerMinutes = 0;
+    this._currentStationMetadata = null;
+
+    // Restore state after page reload
+    this._restoreState();
   }
 
   setConfig(config) {
@@ -73,6 +82,184 @@ class RadioBrowserCard extends HTMLElement {
 
   isFavorite(station) {
     return this._favorites.some(fav => fav.media_content_id === station.media_content_id);
+  }
+
+  // Export/Import favorites
+  exportFavorites() {
+    const data = {
+      version: '1.0',
+      exported: new Date().toISOString(),
+      favorites: this._favorites
+    };
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `radio-favorites-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  importFavorites() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json';
+    input.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const data = JSON.parse(event.target.result);
+          if (data.favorites && Array.isArray(data.favorites)) {
+            this._favorites = data.favorites;
+            this.saveFavorites();
+            this.updatePlaylist();
+            alert(`Imported ${data.favorites.length} favorite stations!`);
+          } else {
+            alert('Invalid file format');
+          }
+        } catch (error) {
+          alert('Error importing favorites: ' + error.message);
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  }
+
+  // State persistence to survive page reloads
+  _saveState() {
+    try {
+      const state = {
+        selectedMediaPlayer: this._selectedMediaPlayer,
+        selectedCountry: this._selectedCountry,
+        currentStationIndex: this._currentStationIndex,
+        isPlaying: this._isPlaying,
+        volume: this._volume,
+        searchQuery: this._searchQuery,
+        timestamp: Date.now()
+      };
+      localStorage.setItem('radio_card_state', JSON.stringify(state));
+    } catch (e) {
+      console.error('Error saving state:', e);
+    }
+  }
+
+  _restoreState() {
+    try {
+      const stored = localStorage.getItem('radio_card_state');
+      if (!stored) return;
+
+      const state = JSON.parse(stored);
+      // Only restore if state is less than 5 minutes old
+      if (Date.now() - state.timestamp < 5 * 60 * 1000) {
+        this._selectedMediaPlayer = state.selectedMediaPlayer;
+        this._selectedCountry = state.selectedCountry;
+        this._currentStationIndex = state.currentStationIndex;
+        this._searchQuery = state.searchQuery || '';
+        this._volume = state.volume || 10;
+        // Don't auto-restore playing state, user needs to click play
+      }
+    } catch (e) {
+      console.error('Error restoring state:', e);
+    }
+  }
+
+  // Mute functionality
+  toggleMute() {
+    if (!this._hass || !this._selectedMediaPlayer) return;
+
+    const volumeSlider = this.shadowRoot.querySelector('.volume-slider');
+    if (!volumeSlider) return;
+
+    if (this._isMuted) {
+      // Unmute - restore previous volume
+      this._isMuted = false;
+      volumeSlider.value = this._volumeBeforeMute;
+      this.handleVolumeChange({ target: { value: this._volumeBeforeMute } });
+    } else {
+      // Mute - save current volume and set to 0
+      this._volumeBeforeMute = parseInt(volumeSlider.value);
+      this._isMuted = true;
+      volumeSlider.value = 0;
+      this.handleVolumeChange({ target: { value: 0 } });
+    }
+
+    // Update mute button icon
+    this.updateMuteButton();
+  }
+
+  updateMuteButton() {
+    const muteBtn = this.shadowRoot.querySelector('.btn-mute');
+    if (muteBtn) {
+      muteBtn.textContent = this._isMuted ? '🔇' : '🔊';
+      muteBtn.title = this._isMuted ? 'Unmute' : 'Mute';
+    }
+  }
+
+  // Sleep timer functionality
+  setSleepTimer(minutes) {
+    // Clear existing timer
+    if (this._sleepTimerInterval) {
+      clearInterval(this._sleepTimerInterval);
+      this._sleepTimerInterval = null;
+    }
+
+    if (minutes === 0) {
+      this._sleepTimer = null;
+      this._sleepTimerMinutes = 0;
+      this.updateSleepTimerDisplay();
+      return;
+    }
+
+    this._sleepTimerMinutes = minutes;
+    this._sleepTimer = Date.now() + (minutes * 60 * 1000);
+
+    // Update display every second
+    this._sleepTimerInterval = setInterval(() => {
+      const remaining = this._sleepTimer - Date.now();
+
+      if (remaining <= 0) {
+        // Timer expired - stop playback
+        this.stop();
+        clearInterval(this._sleepTimerInterval);
+        this._sleepTimerInterval = null;
+        this._sleepTimer = null;
+        this._sleepTimerMinutes = 0;
+        this.updateSleepTimerDisplay();
+      } else {
+        this.updateSleepTimerDisplay();
+      }
+    }, 1000);
+
+    this.updateSleepTimerDisplay();
+  }
+
+  updateSleepTimerDisplay() {
+    const display = this.shadowRoot.querySelector('.sleep-timer-display');
+    if (!display) return;
+
+    if (!this._sleepTimer) {
+      display.textContent = '';
+      display.style.display = 'none';
+      return;
+    }
+
+    const remaining = Math.max(0, this._sleepTimer - Date.now());
+    const minutes = Math.floor(remaining / 60000);
+    const seconds = Math.floor((remaining % 60000) / 1000);
+    display.textContent = `⏲️ ${minutes}:${seconds.toString().padStart(2, '0')}`;
+    display.style.display = 'block';
+  }
+
+  toggleSleepTimerMenu() {
+    const menu = this.shadowRoot.querySelector('.sleep-timer-menu');
+    if (menu) {
+      menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+    }
   }
 
   // Search functionality
@@ -333,7 +520,22 @@ class RadioBrowserCard extends HTMLElement {
       this._currentStationIndex = index;
       this._selectedStationIndex = index;
       this._isPlaying = true;
+
+      // Store station metadata for display
+      this._currentStationMetadata = {
+        title: station.title,
+        media_content_id: station.media_content_id,
+        // Extract additional metadata if available
+        bitrate: this.extractBitrate(station),
+        codec: this.extractCodec(station),
+        country: this.extractCountry(station)
+      };
+
+      // Save state to survive page reloads
+      this._saveState();
+
       this.updatePlaylistSelection();
+      this.updateStationInfo();
 
       // Wait longer for browser player to actually start playing
       const waitTime = isBrowserPlayer ? 2000 : 1500;
@@ -349,6 +551,57 @@ class RadioBrowserCard extends HTMLElement {
       this._isPlaying = false;
       this.stopVisualizer();
     }
+  }
+
+  // Extract metadata from station object
+  extractBitrate(station) {
+    // Radio Browser API includes bitrate in the media_content_id or title sometimes
+    if (station.title && station.title.includes('kbps')) {
+      const match = station.title.match(/(\d+)\s*kbps/i);
+      if (match) return match[1] + ' kbps';
+    }
+    // Could also check station object properties if available
+    return null;
+  }
+
+  extractCodec(station) {
+    if (station.media_content_id) {
+      const url = station.media_content_id.toLowerCase();
+      if (url.includes('.mp3') || url.includes('mp3')) return 'MP3';
+      if (url.includes('.aac') || url.includes('aac')) return 'AAC';
+      if (url.includes('.ogg') || url.includes('ogg')) return 'OGG';
+      if (url.includes('flac')) return 'FLAC';
+    }
+    return null;
+  }
+
+  extractCountry(station) {
+    // The country is stored in _selectedCountry when browsing by country
+    if (this._selectedCountry) {
+      // Find the country object to get its title
+      const country = this._countries.find(c => c.media_content_id === this._selectedCountry);
+      return country ? country.title : null;
+    }
+    return null;
+  }
+
+  updateStationInfo() {
+    const infoEl = this.shadowRoot.querySelector('.station-info');
+    if (!infoEl || !this._currentStationMetadata) return;
+
+    const parts = [];
+    if (this._currentStationMetadata.country) {
+      parts.push(`📍 ${this._currentStationMetadata.country}`);
+    }
+    if (this._currentStationMetadata.codec) {
+      parts.push(`🎵 ${this._currentStationMetadata.codec}`);
+    }
+    if (this._currentStationMetadata.bitrate) {
+      parts.push(`📊 ${this._currentStationMetadata.bitrate}`);
+    }
+
+    infoEl.textContent = parts.join(' • ');
+    infoEl.style.display = parts.length > 0 ? 'block' : 'none';
   }
 
   selectStation(index) {
@@ -413,8 +666,11 @@ class RadioBrowserCard extends HTMLElement {
       });
       this._isPlaying = false;
       this._currentStationIndex = -1;
+      this._currentStationMetadata = null;
       this.stopVisualizer(); // Immediately stop visualizer
       this.updatePlaylistSelection();
+      this.updateStationInfo();
+      this._saveState();
     } catch (error) {
       console.error('Error stopping:', error);
     }
@@ -731,6 +987,11 @@ class RadioBrowserCard extends HTMLElement {
       document.removeEventListener('keydown', this._keyboardHandler);
       this._keyboardHandler = null;
     }
+    // Clean up sleep timer
+    if (this._sleepTimerInterval) {
+      clearInterval(this._sleepTimerInterval);
+      this._sleepTimerInterval = null;
+    }
   }
 
   escapeHtml(text) {
@@ -874,7 +1135,7 @@ class RadioBrowserCard extends HTMLElement {
           position: absolute;
           top: 12px;
           left: 12px;
-          right: 80px;
+          right: 120px;
           height: 18px;
           color: ${colors.text};
           font-size: 11px;
@@ -884,6 +1145,36 @@ class RadioBrowserCard extends HTMLElement {
           text-overflow: ellipsis;
           line-height: 18px;
           z-index: 1;
+        }
+
+        .station-info {
+          position: absolute;
+          top: 30px;
+          left: 12px;
+          right: 120px;
+          height: 14px;
+          color: ${colors.textSecondary};
+          font-size: 9px;
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+          line-height: 14px;
+          z-index: 1;
+        }
+
+        .sleep-timer-display {
+          position: absolute;
+          top: 12px;
+          right: 12px;
+          height: 18px;
+          color: ${colors.primary};
+          font-size: 10px;
+          font-weight: 600;
+          line-height: 18px;
+          z-index: 1;
+          background: ${colors.surfaceLight};
+          padding: 2px 8px;
+          border-radius: 4px;
         }
 
         /* Visualizer */
@@ -1259,10 +1550,32 @@ class RadioBrowserCard extends HTMLElement {
                           onclick="this.getRootNode().host.setVisualizerStyle('circle')">Circle</button>
                 </div>
               </div>
+              <div class="settings-group">
+                <div class="settings-label">Favorites</div>
+                <div class="settings-options">
+                  <button class="settings-option" onclick="this.getRootNode().host.exportFavorites()">📤 Export</button>
+                  <button class="settings-option" onclick="this.getRootNode().host.importFavorites()">📥 Import</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <button class="settings-btn btn-mute" onclick="this.getRootNode().host.toggleMute()" title="Mute">🔊</button>
+          <button class="settings-btn" onclick="this.getRootNode().host.toggleSleepTimerMenu()" title="Sleep Timer">⏲️</button>
+          <div class="settings-menu sleep-timer-menu" style="display: none;">
+            <div class="settings-group">
+              <div class="settings-label">Sleep Timer</div>
+              <div class="settings-options">
+                <button class="settings-option" onclick="this.getRootNode().host.setSleepTimer(15)">15 min</button>
+                <button class="settings-option" onclick="this.getRootNode().host.setSleepTimer(30)">30 min</button>
+                <button class="settings-option" onclick="this.getRootNode().host.setSleepTimer(60)">60 min</button>
+                <button class="settings-option" onclick="this.getRootNode().host.setSleepTimer(0)">Off</button>
+              </div>
             </div>
           </div>
 
           <div class="track-title">Radio Browser</div>
+          <div class="station-info" style="display: none;"></div>
+          <div class="sleep-timer-display" style="display: none;"></div>
 
           <!-- Visualizer -->
           <canvas class="visualizer" width="80" height="32"></canvas>
