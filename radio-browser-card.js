@@ -691,7 +691,14 @@ class RadioBrowserCard extends HTMLElement {
   async handleVolumeChange(e) {
     if (!this._hass || !this._selectedMediaPlayer) return;
 
-    const volume = parseFloat(e.target.value) / 100; // Convert to 0.0 - 1.0
+    const volumePercent = parseFloat(e.target.value);
+    const volume = volumePercent / 100; // Convert to 0.0 - 1.0
+
+    // Update slider gradient
+    const volumeSlider = this.shadowRoot.querySelector('.volume-slider');
+    if (volumeSlider) {
+      volumeSlider.style.setProperty('--volume-percent', volumePercent + '%');
+    }
 
     try {
       await this._hass.callService('media_player', 'volume_set', {
@@ -779,10 +786,12 @@ class RadioBrowserCard extends HTMLElement {
       titleEl.textContent = entity.attributes.media_title;
     }
 
-    // Update volume slider
+    // Update volume slider and gradient
     const volumeSlider = this.shadowRoot.querySelector('.volume-slider');
     if (volumeSlider && entity.attributes.volume_level !== undefined) {
-      volumeSlider.value = Math.round(entity.attributes.volume_level * 100);
+      const volumePercent = Math.round(entity.attributes.volume_level * 100);
+      volumeSlider.value = volumePercent;
+      volumeSlider.style.setProperty('--volume-percent', volumePercent + '%');
     }
 
     // Update visualizer based on play state
@@ -790,6 +799,11 @@ class RadioBrowserCard extends HTMLElement {
       this.startVisualizer();
     } else {
       this.stopVisualizer();
+    }
+
+    // Update station info if playing
+    if (this._currentStationMetadata) {
+      this.updateStationInfo();
     }
   }
 
@@ -1167,14 +1181,18 @@ class RadioBrowserCard extends HTMLElement {
           top: 30px;
           left: 12px;
           right: 120px;
-          height: 14px;
-          color: ${colors.textSecondary};
-          font-size: 9px;
+          height: 16px;
+          color: ${colors.primary};
+          font-size: 10px;
+          font-weight: 500;
           overflow: hidden;
           white-space: nowrap;
           text-overflow: ellipsis;
-          line-height: 14px;
-          z-index: 1;
+          line-height: 16px;
+          z-index: 2;
+          background: ${colors.surfaceLight};
+          padding: 2px 6px;
+          border-radius: 3px;
         }
 
         .sleep-timer-display {
@@ -1225,48 +1243,63 @@ class RadioBrowserCard extends HTMLElement {
 
         .volume-slider {
           width: 100%;
-          height: 4px;
+          height: 6px;
           -webkit-appearance: none;
-          background: transparent;
+          background: linear-gradient(to right, ${colors.primary} 0%, ${colors.primary} var(--volume-percent, 50%), ${colors.surfaceLight} var(--volume-percent, 50%), ${colors.surfaceLight} 100%);
           outline: none;
+          border-radius: 3px;
+          cursor: pointer;
         }
 
         .volume-slider::-webkit-slider-track {
           width: 100%;
-          height: 4px;
-          background: ${colors.textTertiary};
-          border-radius: 2px;
+          height: 6px;
+          background: transparent;
+          border-radius: 3px;
         }
 
         .volume-slider::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
-          width: 12px;
-          height: 12px;
+          width: 14px;
+          height: 14px;
           background: ${colors.primary};
           cursor: pointer;
           border-radius: 50%;
           transition: transform 0.2s;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
 
         .volume-slider::-webkit-slider-thumb:hover {
-          transform: scale(1.2);
+          transform: scale(1.3);
+          box-shadow: 0 2px 8px rgba(29, 185, 84, 0.5);
         }
 
         .volume-slider::-moz-range-track {
           width: 100%;
-          height: 4px;
-          background: ${colors.textTertiary};
-          border-radius: 2px;
+          height: 6px;
+          background: ${colors.surfaceLight};
+          border-radius: 3px;
+        }
+
+        .volume-slider::-moz-range-progress {
+          height: 6px;
+          background: ${colors.primary};
+          border-radius: 3px;
         }
 
         .volume-slider::-moz-range-thumb {
-          width: 12px;
-          height: 12px;
+          width: 14px;
+          height: 14px;
           background: ${colors.primary};
           cursor: pointer;
           border-radius: 50%;
           border: none;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .volume-slider::-moz-range-thumb:hover {
+          transform: scale(1.3);
         }
 
         /* Control buttons - Modern flat style */
