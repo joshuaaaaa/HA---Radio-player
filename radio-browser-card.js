@@ -12,6 +12,8 @@ class RadioBrowserCard extends HTMLElement {
     this._isPlaying = false;
     this._volume = 10;
     this._visualizerInterval = null;
+    this._searchFilter = '';
+    this._keyboardListenerAdded = false;
   }
 
   setConfig(config) {
@@ -286,6 +288,47 @@ class RadioBrowserCard extends HTMLElement {
     }
   }
 
+  async playNext() {
+    const filteredStations = this.getFilteredStations();
+    if (filteredStations.length === 0) return;
+
+    let nextIndex = this._currentStationIndex + 1;
+    if (nextIndex >= this._stations.length) {
+      nextIndex = 0; // Loop to beginning
+    }
+
+    // Find next station in filtered list
+    while (nextIndex !== this._currentStationIndex) {
+      const station = this._stations[nextIndex];
+      if (this.matchesFilter(station)) {
+        await this.playStation(station, nextIndex);
+        return;
+      }
+      nextIndex = (nextIndex + 1) % this._stations.length;
+    }
+  }
+
+  async playPrevious() {
+    const filteredStations = this.getFilteredStations();
+    if (filteredStations.length === 0) return;
+
+    let prevIndex = this._currentStationIndex - 1;
+    if (prevIndex < 0) {
+      prevIndex = this._stations.length - 1; // Loop to end
+    }
+
+    // Find previous station in filtered list
+    while (prevIndex !== this._currentStationIndex) {
+      const station = this._stations[prevIndex];
+      if (this.matchesFilter(station)) {
+        await this.playStation(station, prevIndex);
+        return;
+      }
+      prevIndex = prevIndex - 1;
+      if (prevIndex < 0) prevIndex = this._stations.length - 1;
+    }
+  }
+
   async handleVolumeChange(e) {
     if (!this._hass || !this._selectedMediaPlayer) return;
 
@@ -301,6 +344,21 @@ class RadioBrowserCard extends HTMLElement {
     }
   }
 
+  handleSearchInput(e) {
+    this._searchFilter = e.target.value.toLowerCase();
+    this.updatePlaylist();
+  }
+
+  matchesFilter(station) {
+    if (!this._searchFilter) return true;
+    return station.title.toLowerCase().includes(this._searchFilter);
+  }
+
+  getFilteredStations() {
+    if (!this._searchFilter) return this._stations;
+    return this._stations.filter(station => this.matchesFilter(station));
+  }
+
   updatePlaylist() {
     const playlistEl = this.shadowRoot.querySelector('.playlist-items');
     if (!playlistEl) return;
@@ -310,7 +368,17 @@ class RadioBrowserCard extends HTMLElement {
       return;
     }
 
-    playlistEl.innerHTML = this._stations.map((station, index) => {
+    // Filter stations based on search
+    const filteredItems = this._stations
+      .map((station, index) => ({ station, index }))
+      .filter(({ station }) => this.matchesFilter(station));
+
+    if (filteredItems.length === 0 && this._searchFilter) {
+      playlistEl.innerHTML = '<div style="padding: 12px; color: #b3b3b3; text-align: center;">No stations found</div>';
+      return;
+    }
+
+    playlistEl.innerHTML = filteredItems.map(({ station, index }) => {
       const classes = [];
       if (index === this._currentStationIndex) classes.push('current');
       if (index === this._selectedStationIndex) classes.push('selected');
@@ -410,6 +478,9 @@ class RadioBrowserCard extends HTMLElement {
 
   disconnectedCallback() {
     this.stopVisualizer();
+    if (this._keyboardHandler) {
+      document.removeEventListener('keydown', this._keyboardHandler);
+    }
   }
 
   escapeHtml(text) {
@@ -648,7 +719,7 @@ class RadioBrowserCard extends HTMLElement {
           background: #181818;
         }
 
-        .player-select, .country-select {
+        .player-select, .country-select, .search-input {
           width: 100%;
           height: 36px;
           background: #282828;
@@ -663,11 +734,19 @@ class RadioBrowserCard extends HTMLElement {
           transition: background 0.2s;
         }
 
-        .player-select:hover, .country-select:hover {
+        .search-input {
+          cursor: text;
+        }
+
+        .search-input::placeholder {
+          color: #535353;
+        }
+
+        .player-select:hover, .country-select:hover, .search-input:hover {
           background: #333333;
         }
 
-        .player-select:focus, .country-select:focus {
+        .player-select:focus, .country-select:focus, .search-input:focus {
           outline: 2px solid #1DB954;
           outline-offset: -2px;
         }
@@ -772,11 +851,11 @@ class RadioBrowserCard extends HTMLElement {
 
           <!-- Control Buttons -->
           <div class="control-buttons">
-            <button class="control-btn btn-prev" title="Previous"></button>
-            <button class="control-btn btn-play" onclick="this.getRootNode().host.togglePlay()" title="Play"></button>
-            <button class="control-btn btn-pause" onclick="this.getRootNode().host.togglePlay()" title="Pause"></button>
+            <button class="control-btn btn-prev" onclick="this.getRootNode().host.playPrevious()" title="Previous (←)"></button>
+            <button class="control-btn btn-play" onclick="this.getRootNode().host.togglePlay()" title="Play/Pause (Space)"></button>
+            <button class="control-btn btn-pause" onclick="this.getRootNode().host.togglePlay()" title="Pause (Space)"></button>
             <button class="control-btn btn-stop" onclick="this.getRootNode().host.stop()" title="Stop"></button>
-            <button class="control-btn btn-next" title="Next"></button>
+            <button class="control-btn btn-next" onclick="this.getRootNode().host.playNext()" title="Next (→)"></button>
           </div>
 
           <!-- Volume Control -->
@@ -796,6 +875,8 @@ class RadioBrowserCard extends HTMLElement {
             <select class="country-select" onchange="this.getRootNode().host.handleCountryChange(event)">
               <option value="">Select Country...</option>
             </select>
+            <input type="text" class="search-input" placeholder="🔍 Search stations..."
+                   oninput="this.getRootNode().host.handleSearchInput(event)">
           </div>
 
           <!-- Playlist body -->
@@ -811,7 +892,49 @@ class RadioBrowserCard extends HTMLElement {
     this.setupEventListeners();
   }
 
-  setupEventListeners() {}
+  setupEventListeners() {
+    // Add keyboard shortcuts (only once)
+    if (!this._keyboardListenerAdded) {
+      this._keyboardHandler = (e) => {
+        // Don't trigger if user is typing in an input field
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+
+        switch(e.key) {
+          case ' ': // Space - Play/Pause
+            e.preventDefault();
+            this.togglePlay();
+            break;
+          case 'ArrowLeft': // Left arrow - Previous
+            e.preventDefault();
+            this.playPrevious();
+            break;
+          case 'ArrowRight': // Right arrow - Next
+            e.preventDefault();
+            this.playNext();
+            break;
+          case 'ArrowUp': // Up arrow - Volume up
+            e.preventDefault();
+            this.adjustVolume(5);
+            break;
+          case 'ArrowDown': // Down arrow - Volume down
+            e.preventDefault();
+            this.adjustVolume(-5);
+            break;
+        }
+      };
+      document.addEventListener('keydown', this._keyboardHandler);
+      this._keyboardListenerAdded = true;
+    }
+  }
+
+  adjustVolume(delta) {
+    const volumeSlider = this.shadowRoot.querySelector('.volume-slider');
+    if (volumeSlider) {
+      const newValue = Math.max(0, Math.min(100, parseInt(volumeSlider.value) + delta));
+      volumeSlider.value = newValue;
+      this.handleVolumeChange({ target: { value: newValue } });
+    }
+  }
 
   static getConfigElement() {
     return document.createElement("radio-browser-card-editor");
