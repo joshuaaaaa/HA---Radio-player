@@ -212,6 +212,8 @@ class RadioBrowserCard extends HTMLElement {
       this._sleepTimer = null;
       this._sleepTimerMinutes = 0;
       this.updateSleepTimerDisplay();
+      // Close the menu
+      this.closeSleepTimerMenu();
       return;
     }
 
@@ -236,6 +238,9 @@ class RadioBrowserCard extends HTMLElement {
     }, 1000);
 
     this.updateSleepTimerDisplay();
+
+    // Close the menu after setting timer
+    this.closeSleepTimerMenu();
   }
 
   updateSleepTimerDisplay() {
@@ -259,6 +264,13 @@ class RadioBrowserCard extends HTMLElement {
     const menu = this.shadowRoot.querySelector('.sleep-timer-menu');
     if (menu) {
       menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+    }
+  }
+
+  closeSleepTimerMenu() {
+    const menu = this.shadowRoot.querySelector('.sleep-timer-menu');
+    if (menu) {
+      menu.style.display = 'none';
     }
   }
 
@@ -998,14 +1010,17 @@ class RadioBrowserCard extends HTMLElement {
           overflow: hidden;
         }
 
-        /* Settings bar */
+        /* Settings bar - below playlist */
         .settings-bar {
-          position: absolute;
-          top: 8px;
-          right: 8px;
           display: flex;
-          gap: 4px;
-          z-index: 10;
+          gap: 8px;
+          padding: 12px;
+          background: ${colors.background};
+          border-radius: 8px;
+          margin-top: 8px;
+          justify-content: center;
+          align-items: center;
+          position: relative;
         }
 
         .settings-btn {
@@ -1487,55 +1502,6 @@ class RadioBrowserCard extends HTMLElement {
       <div class="winamp-container">
         <!-- Main Player Window -->
         <div class="main-window">
-          <!-- Settings Bar -->
-          <div class="settings-bar">
-            <button class="settings-btn" onclick="this.getRootNode().host.toggleSettings(event)" title="Settings">⚙</button>
-            <div class="settings-menu" id="settings-menu">
-              <div class="settings-group">
-                <div class="settings-label">Theme</div>
-                <div class="settings-options">
-                  <button class="settings-option ${this._theme === 'dark' ? 'active' : ''}"
-                          onclick="this.getRootNode().host.setTheme('dark')">Dark</button>
-                  <button class="settings-option ${this._theme === 'light' ? 'active' : ''}"
-                          onclick="this.getRootNode().host.setTheme('light')">Light</button>
-                  <button class="settings-option ${this._theme === 'custom' ? 'active' : ''}"
-                          onclick="this.getRootNode().host.setTheme('custom')">Custom</button>
-                </div>
-              </div>
-              <div class="settings-group">
-                <div class="settings-label">Visualizer</div>
-                <div class="settings-options">
-                  <button class="settings-option ${this._visualizerStyle === 'bars' ? 'active' : ''}"
-                          onclick="this.getRootNode().host.setVisualizerStyle('bars')">Bars</button>
-                  <button class="settings-option ${this._visualizerStyle === 'waveform' ? 'active' : ''}"
-                          onclick="this.getRootNode().host.setVisualizerStyle('waveform')">Wave</button>
-                  <button class="settings-option ${this._visualizerStyle === 'circle' ? 'active' : ''}"
-                          onclick="this.getRootNode().host.setVisualizerStyle('circle')">Circle</button>
-                </div>
-              </div>
-              <div class="settings-group">
-                <div class="settings-label">Favorites</div>
-                <div class="settings-options">
-                  <button class="settings-option" onclick="this.getRootNode().host.exportFavorites()">📤 Export</button>
-                  <button class="settings-option" onclick="this.getRootNode().host.importFavorites()">📥 Import</button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <button class="settings-btn btn-mute" onclick="this.getRootNode().host.toggleMute()" title="Mute">🔊</button>
-          <button class="settings-btn" onclick="this.getRootNode().host.toggleSleepTimerMenu()" title="Sleep Timer">⏲️</button>
-          <div class="settings-menu sleep-timer-menu" style="display: none;">
-            <div class="settings-group">
-              <div class="settings-label">Sleep Timer</div>
-              <div class="settings-options">
-                <button class="settings-option" onclick="this.getRootNode().host.setSleepTimer(15)">15 min</button>
-                <button class="settings-option" onclick="this.getRootNode().host.setSleepTimer(30)">30 min</button>
-                <button class="settings-option" onclick="this.getRootNode().host.setSleepTimer(60)">60 min</button>
-                <button class="settings-option" onclick="this.getRootNode().host.setSleepTimer(0)">Off</button>
-              </div>
-            </div>
-          </div>
-
           <div class="track-title">Radio Browser</div>
           <div class="station-info" style="display: none;"></div>
           <div class="sleep-timer-display" style="display: none;"></div>
@@ -1579,6 +1545,59 @@ class RadioBrowserCard extends HTMLElement {
           <div class="playlist-body">
             <div class="playlist-display">
               <div class="playlist-items"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings Bar (below playlist) -->
+        <div class="settings-bar">
+          <button class="settings-btn" onclick="this.getRootNode().host.toggleSettings(event)" title="Settings">⚙️</button>
+          <button class="settings-btn btn-mute" onclick="this.getRootNode().host.toggleMute()" title="Mute">🔊</button>
+          <button class="settings-btn" onclick="this.getRootNode().host.toggleSleepTimerMenu()" title="Sleep Timer">⏲️</button>
+
+          <!-- Settings Menu -->
+          <div class="settings-menu" id="settings-menu">
+            <div class="settings-group">
+              <div class="settings-label">Theme</div>
+              <div class="settings-options">
+                <button class="settings-option ${this._theme === 'dark' ? 'active' : ''}"
+                        onclick="this.getRootNode().host.setTheme('dark')">Dark</button>
+                <button class="settings-option ${this._theme === 'light' ? 'active' : ''}"
+                        onclick="this.getRootNode().host.setTheme('light')">Light</button>
+                <button class="settings-option ${this._theme === 'custom' ? 'active' : ''}"
+                        onclick="this.getRootNode().host.setTheme('custom')">Custom</button>
+              </div>
+            </div>
+            <div class="settings-group">
+              <div class="settings-label">Visualizer</div>
+              <div class="settings-options">
+                <button class="settings-option ${this._visualizerStyle === 'bars' ? 'active' : ''}"
+                        onclick="this.getRootNode().host.setVisualizerStyle('bars')">Bars</button>
+                <button class="settings-option ${this._visualizerStyle === 'waveform' ? 'active' : ''}"
+                        onclick="this.getRootNode().host.setVisualizerStyle('waveform')">Wave</button>
+                <button class="settings-option ${this._visualizerStyle === 'circle' ? 'active' : ''}"
+                        onclick="this.getRootNode().host.setVisualizerStyle('circle')">Circle</button>
+              </div>
+            </div>
+            <div class="settings-group">
+              <div class="settings-label">Favorites</div>
+              <div class="settings-options">
+                <button class="settings-option" onclick="this.getRootNode().host.exportFavorites()">📤 Export</button>
+                <button class="settings-option" onclick="this.getRootNode().host.importFavorites()">📥 Import</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sleep Timer Menu -->
+          <div class="settings-menu sleep-timer-menu" style="display: none;">
+            <div class="settings-group">
+              <div class="settings-label">Sleep Timer</div>
+              <div class="settings-options">
+                <button class="settings-option" onclick="this.getRootNode().host.setSleepTimer(15)">15 min</button>
+                <button class="settings-option" onclick="this.getRootNode().host.setSleepTimer(30)">30 min</button>
+                <button class="settings-option" onclick="this.getRootNode().host.setSleepTimer(60)">60 min</button>
+                <button class="settings-option" onclick="this.getRootNode().host.setSleepTimer(0)">Off</button>
+              </div>
             </div>
           </div>
         </div>
