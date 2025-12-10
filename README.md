@@ -9,15 +9,17 @@ A modern **radio player card** for Home Assistant! Browse and play internet radi
 ## ✨ Features
 
 - 🎨 **Modern Dark Design** - Minimalist dark theme (#121212) inspired by Spotify's design language
-- 📊 **Animated Visualizer** - Smooth green (#1DB954) audio visualizer bars
+- 📊 **Animated Visualizer** - Smooth green (#1DB954) audio visualizer bars with multiple styles
 - 🎛️ **Full Controls** - Circular buttons with Previous, Play, Pause, Stop, Next
 - 📋 **Playlist Editor** - Clean playlist window with smooth hover effects
+- ⭐ **Favorites Management** - Save your favorite stations with a click
+- 🎨 **Theme Support** - Dark, Light, and Custom theme options
 - 🔊 **Volume Slider** - Modern horizontal slider with green accent
 - 📻 **Radio Browser Integration** - Browse and play thousands of internet radio stations
 - 🌍 **Country Filter** - Filter stations by country to avoid loading 43k+ stations at once
 - 🔍 **Search/Filter** - Real-time search to filter stations by name
 - 🖱️ **Click to Play** - Double-click any station in the playlist to start playing
-- ⏮️⏭️ **Previous/Next** - Navigate through stations with buttons or arrow keys
+- ⏮️⏭️ **Previous/Next** - Navigate through stations with buttons or arrow keys (with looping)
 - ⌨️ **Keyboard Shortcuts** - Space (play/pause), arrows (prev/next/volume)
 - 💫 **Smooth Animations** - Hover effects, scale transforms, and transitions throughout
 
@@ -109,19 +111,26 @@ Use the search box to filter stations by name in real-time:
 - **Double-click** to play the station
 - Or use the **Play button** to play the selected/first station
 
-### 6. Navigate
+### 6. Manage Favorites
+
+- **Click the ★ icon** next to any station to add it to favorites
+- **Click ★ again** to remove from favorites
+- When no country is selected, your **favorites list** is displayed
+- Navigate through favorites using Previous/Next buttons
+
+### 7. Navigate
 
 - **⏭ Next** - Play next station (button or → key)
 - **⏮ Previous** - Play previous station (button or ← key)
 - **▶ Play/Pause** - Toggle playback (button or Space key)
 - **⏹ Stop** - Stop playback
 
-### 7. Control Volume
+### 8. Control Volume
 
 - Use the slider to adjust volume
 - Or use **↑/↓ arrow keys** for fine control
 
-### 8. Keyboard Shortcuts
+### 9. Keyboard Shortcuts
 
 - **Space** - Play/Pause
 - **← Left Arrow** - Previous station

@@ -12,8 +12,11 @@ class RadioBrowserCard extends HTMLElement {
     this._isPlaying = false;
     this._volume = 10;
     this._visualizerInterval = null;
-    this._searchFilter = '';
-    this._keyboardListenerAdded = false;
+    this._favorites = this.loadFavorites();
+    this._searchQuery = '';
+    this._visualizerStyle = localStorage.getItem('radio_visualizer_style') || 'bars';
+    this._theme = localStorage.getItem('radio_theme') || 'dark';
+    this._keyboardHandler = null;
   }
 
   setConfig(config) {
@@ -37,6 +40,135 @@ class RadioBrowserCard extends HTMLElement {
     }
 
     this.updateDisplay();
+  }
+
+  // Favorites management
+  loadFavorites() {
+    try {
+      const stored = localStorage.getItem('radio_favorites');
+      return stored ? JSON.parse(stored) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  saveFavorites() {
+    try {
+      localStorage.setItem('radio_favorites', JSON.stringify(this._favorites));
+    } catch (e) {
+      console.error('Error saving favorites:', e);
+    }
+  }
+
+  toggleFavorite(station) {
+    const index = this._favorites.findIndex(fav => fav.media_content_id === station.media_content_id);
+    if (index >= 0) {
+      this._favorites.splice(index, 1);
+    } else {
+      this._favorites.push(station);
+    }
+    this.saveFavorites();
+    this.updatePlaylist();
+  }
+
+  isFavorite(station) {
+    return this._favorites.some(fav => fav.media_content_id === station.media_content_id);
+  }
+
+  // Search functionality
+  handleSearchInput(e) {
+    this._searchQuery = e.target.value.toLowerCase();
+    this.updatePlaylist();
+  }
+
+  getFilteredStations() {
+    // If no country selected, show favorites
+    let stations = this._stations.length > 0 ? this._stations : this._favorites;
+
+    if (this._searchQuery) {
+      stations = stations.filter(station =>
+        station.title.toLowerCase().includes(this._searchQuery)
+      );
+    }
+    return stations;
+  }
+
+  // Theme management
+  setTheme(theme) {
+    this._theme = theme;
+    localStorage.setItem('radio_theme', theme);
+
+    // Store visualizer state before re-render
+    const wasPlaying = this._visualizerInterval !== null;
+
+    this.render();
+
+    // Restart visualizer if it was running
+    if (wasPlaying && this._isPlaying) {
+      this.startVisualizer();
+    }
+  }
+
+  // Visualizer style management
+  setVisualizerStyle(style) {
+    this._visualizerStyle = style;
+    localStorage.setItem('radio_visualizer_style', style);
+    this.stopVisualizer();
+    if (this._isPlaying) {
+      this.startVisualizer();
+    }
+  }
+
+  // Navigation with looping support
+  async playPrevious() {
+    const filteredStations = this.getFilteredStations();
+    if (filteredStations.length === 0) return;
+
+    const sourceList = this._stations.length > 0 ? this._stations : this._favorites;
+    if (sourceList.length === 0) return;
+
+    let prevIndex = this._currentStationIndex - 1;
+    if (prevIndex < 0) {
+      prevIndex = sourceList.length - 1; // Loop to end
+    }
+
+    // Find previous station in filtered list
+    let attempts = 0;
+    while (attempts < sourceList.length) {
+      const station = sourceList[prevIndex];
+      if (!this._searchQuery || station.title.toLowerCase().includes(this._searchQuery)) {
+        await this.playStation(station, prevIndex);
+        return;
+      }
+      prevIndex = prevIndex - 1;
+      if (prevIndex < 0) prevIndex = sourceList.length - 1;
+      attempts++;
+    }
+  }
+
+  async playNext() {
+    const filteredStations = this.getFilteredStations();
+    if (filteredStations.length === 0) return;
+
+    const sourceList = this._stations.length > 0 ? this._stations : this._favorites;
+    if (sourceList.length === 0) return;
+
+    let nextIndex = this._currentStationIndex + 1;
+    if (nextIndex >= sourceList.length) {
+      nextIndex = 0; // Loop to beginning
+    }
+
+    // Find next station in filtered list
+    let attempts = 0;
+    while (attempts < sourceList.length) {
+      const station = sourceList[nextIndex];
+      if (!this._searchQuery || station.title.toLowerCase().includes(this._searchQuery)) {
+        await this.playStation(station, nextIndex);
+        return;
+      }
+      nextIndex = (nextIndex + 1) % sourceList.length;
+      attempts++;
+    }
   }
 
   updateMediaPlayers() {
@@ -288,47 +420,6 @@ class RadioBrowserCard extends HTMLElement {
     }
   }
 
-  async playNext() {
-    const filteredStations = this.getFilteredStations();
-    if (filteredStations.length === 0) return;
-
-    let nextIndex = this._currentStationIndex + 1;
-    if (nextIndex >= this._stations.length) {
-      nextIndex = 0; // Loop to beginning
-    }
-
-    // Find next station in filtered list
-    while (nextIndex !== this._currentStationIndex) {
-      const station = this._stations[nextIndex];
-      if (this.matchesFilter(station)) {
-        await this.playStation(station, nextIndex);
-        return;
-      }
-      nextIndex = (nextIndex + 1) % this._stations.length;
-    }
-  }
-
-  async playPrevious() {
-    const filteredStations = this.getFilteredStations();
-    if (filteredStations.length === 0) return;
-
-    let prevIndex = this._currentStationIndex - 1;
-    if (prevIndex < 0) {
-      prevIndex = this._stations.length - 1; // Loop to end
-    }
-
-    // Find previous station in filtered list
-    while (prevIndex !== this._currentStationIndex) {
-      const station = this._stations[prevIndex];
-      if (this.matchesFilter(station)) {
-        await this.playStation(station, prevIndex);
-        return;
-      }
-      prevIndex = prevIndex - 1;
-      if (prevIndex < 0) prevIndex = this._stations.length - 1;
-    }
-  }
-
   async handleVolumeChange(e) {
     if (!this._hass || !this._selectedMediaPlayer) return;
 
@@ -344,63 +435,67 @@ class RadioBrowserCard extends HTMLElement {
     }
   }
 
-  handleSearchInput(e) {
-    this._searchFilter = e.target.value.toLowerCase();
-    this.updatePlaylist();
-  }
-
-  matchesFilter(station) {
-    if (!this._searchFilter) return true;
-    return station.title.toLowerCase().includes(this._searchFilter);
-  }
-
-  getFilteredStations() {
-    if (!this._searchFilter) return this._stations;
-    return this._stations.filter(station => this.matchesFilter(station));
-  }
-
   updatePlaylist() {
     const playlistEl = this.shadowRoot.querySelector('.playlist-items');
     if (!playlistEl) return;
 
-    if (this._stations.length === 0) {
-      playlistEl.innerHTML = '';
+    const filteredStations = this.getFilteredStations();
+    const showingFavorites = this._stations.length === 0 && this._favorites.length > 0;
+
+    if (filteredStations.length === 0) {
+      const message = this._searchQuery ?
+        'No stations found' :
+        (showingFavorites ? 'No favorite stations yet. Add some by clicking ★' : 'Select a country to see stations');
+      playlistEl.innerHTML = `<div style="padding: 16px; color: #b3b3b3; text-align: center;">${message}</div>`;
       return;
     }
 
-    // Filter stations based on search
-    const filteredItems = this._stations
-      .map((station, index) => ({ station, index }))
-      .filter(({ station }) => this.matchesFilter(station));
+    // Show header for favorites
+    const headerHtml = showingFavorites ?
+      '<div style="padding: 8px 12px; color: #1DB954; font-size: 11px; font-weight: 600;">⭐ Favorite Stations</div>' : '';
 
-    if (filteredItems.length === 0 && this._searchFilter) {
-      playlistEl.innerHTML = '<div style="padding: 12px; color: #b3b3b3; text-align: center;">No stations found</div>';
-      return;
-    }
-
-    playlistEl.innerHTML = filteredItems.map(({ station, index }) => {
+    playlistEl.innerHTML = headerHtml + filteredStations.map((station, displayIndex) => {
+      const sourceList = this._stations.length > 0 ? this._stations : this._favorites;
+      const actualIndex = sourceList.indexOf(station);
       const classes = [];
-      if (index === this._currentStationIndex) classes.push('current');
-      if (index === this._selectedStationIndex) classes.push('selected');
+      if (actualIndex === this._currentStationIndex) classes.push('current');
+      if (actualIndex === this._selectedStationIndex) classes.push('selected');
+      const isFav = this.isFavorite(station);
 
       return `
         <div class="playlist-item ${classes.join(' ')}"
-             data-index="${index}">
-          <span class="item-number">${(index + 1)}.</span>
+             data-index="${actualIndex}"
+             data-is-favorite="${showingFavorites}">
+          <span class="item-number">${(displayIndex + 1)}.</span>
           <span class="item-title">${this.escapeHtml(station.title)}</span>
+          <span class="favorite-icon ${isFav ? 'active' : ''}" data-station-index="${actualIndex}">★</span>
         </div>
       `;
     }).join('');
 
+    // Add event listeners
     playlistEl.querySelectorAll('.playlist-item').forEach(item => {
+      const starBtn = item.querySelector('.favorite-icon');
+      const index = parseInt(item.dataset.index);
+      const isFavoriteList = item.dataset.isFavorite === 'true';
+      const sourceList = isFavoriteList ? this._favorites : this._stations;
+
+      // Favorite toggle
+      if (starBtn) {
+        starBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.toggleFavorite(sourceList[index]);
+        });
+      }
+
+      // Select station
       item.addEventListener('click', () => {
-        const index = parseInt(item.dataset.index);
         this.selectStation(index);
       });
 
+      // Play station on double-click
       item.addEventListener('dblclick', () => {
-        const index = parseInt(item.dataset.index);
-        this.playStation(this._stations[index], index);
+        this.playStation(sourceList[index], index);
       });
     });
   }
@@ -437,28 +532,137 @@ class RadioBrowserCard extends HTMLElement {
     if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
+    const primaryColor = this.getThemeColors().primary;
+
+    if (this._visualizerStyle === 'bars') {
+      this.startBarsVisualizer(ctx, canvas, primaryColor);
+    } else if (this._visualizerStyle === 'waveform') {
+      this.startWaveformVisualizer(ctx, canvas, primaryColor);
+    } else if (this._visualizerStyle === 'circle') {
+      this.startCircleVisualizer(ctx, canvas, primaryColor);
+    }
+  }
+
+  startBarsVisualizer(ctx, canvas, color) {
     const bars = 20;
     const barWidth = Math.floor(canvas.width / bars);
     const heights = new Array(bars).fill(0);
 
     this._visualizerInterval = setInterval(() => {
-      // Clear with dark background
-      ctx.fillStyle = '#181818';
+      ctx.fillStyle = this.getThemeColors().visualizerBg;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       for (let i = 0; i < bars; i++) {
-        // Random height with some smoothing
         heights[i] = heights[i] * 0.7 + Math.random() * canvas.height * 0.3;
-
         const barHeight = Math.floor(heights[i]);
         const x = i * barWidth;
         const y = canvas.height - barHeight;
-
-        // Draw modern Spotify green bars
-        ctx.fillStyle = '#1DB954';
+        ctx.fillStyle = color;
         ctx.fillRect(x + 1, y, barWidth - 2, barHeight);
       }
-    }, 50); // 20 FPS
+    }, 50);
+  }
+
+  startWaveformVisualizer(ctx, canvas, color) {
+    const points = 60;
+    const heights = new Array(points).fill(canvas.height / 2);
+    let offset = 0;
+
+    this._visualizerInterval = setInterval(() => {
+      ctx.fillStyle = this.getThemeColors().visualizerBg;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+
+      for (let i = 0; i < points; i++) {
+        const targetHeight = canvas.height / 2 + (Math.sin((i + offset) * 0.3) * Math.random() * canvas.height * 0.3);
+        heights[i] = heights[i] * 0.8 + targetHeight * 0.2;
+        const x = (canvas.width / points) * i;
+        if (i === 0) {
+          ctx.moveTo(x, heights[i]);
+        } else {
+          ctx.lineTo(x, heights[i]);
+        }
+      }
+      ctx.stroke();
+      offset += 0.5;
+    }, 50);
+  }
+
+  startCircleVisualizer(ctx, canvas, color) {
+    const bars = 30;
+    const heights = new Array(bars).fill(0);
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const baseRadius = Math.min(centerX, centerY) * 0.3;
+
+    this._visualizerInterval = setInterval(() => {
+      ctx.fillStyle = this.getThemeColors().visualizerBg;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = 0; i < bars; i++) {
+        heights[i] = heights[i] * 0.7 + Math.random() * 15;
+        const angle = (i / bars) * Math.PI * 2;
+        const innerRadius = baseRadius;
+        const outerRadius = baseRadius + heights[i];
+
+        const x1 = centerX + Math.cos(angle) * innerRadius;
+        const y1 = centerY + Math.sin(angle) * innerRadius;
+        const x2 = centerX + Math.cos(angle) * outerRadius;
+        const y2 = centerY + Math.sin(angle) * outerRadius;
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      }
+    }, 50);
+  }
+
+  getThemeColors() {
+    const themes = {
+      dark: {
+        background: '#121212',
+        surface: '#181818',
+        surfaceLight: '#282828',
+        surfaceLighter: '#333333',
+        primary: '#1DB954',
+        primaryHover: '#1ed760',
+        text: '#ffffff',
+        textSecondary: '#b3b3b3',
+        textTertiary: '#535353',
+        visualizerBg: '#181818'
+      },
+      light: {
+        background: '#ffffff',
+        surface: '#f5f5f5',
+        surfaceLight: '#e0e0e0',
+        surfaceLighter: '#d0d0d0',
+        primary: '#1DB954',
+        primaryHover: '#1ed760',
+        text: '#000000',
+        textSecondary: '#666666',
+        textTertiary: '#999999',
+        visualizerBg: '#f0f0f0'
+      },
+      custom: {
+        background: this.config?.theme_background || '#121212',
+        surface: this.config?.theme_surface || '#181818',
+        surfaceLight: this.config?.theme_surface_light || '#282828',
+        surfaceLighter: this.config?.theme_surface_lighter || '#333333',
+        primary: this.config?.theme_primary || '#1DB954',
+        primaryHover: this.config?.theme_primary_hover || '#1ed760',
+        text: this.config?.theme_text || '#ffffff',
+        textSecondary: this.config?.theme_text_secondary || '#b3b3b3',
+        textTertiary: this.config?.theme_text_tertiary || '#535353',
+        visualizerBg: this.config?.theme_visualizer_bg || '#181818'
+      }
+    };
+    return themes[this._theme] || themes.dark;
   }
 
   stopVisualizer() {
@@ -466,20 +670,66 @@ class RadioBrowserCard extends HTMLElement {
       clearInterval(this._visualizerInterval);
       this._visualizerInterval = null;
 
-      // Clear canvas with dark background
+      // Clear canvas with theme background
       const canvas = this.shadowRoot.querySelector('.visualizer');
       if (canvas) {
         const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#181818';
+        ctx.fillStyle = this.getThemeColors().visualizerBg;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
     }
+  }
+
+  setupKeyboardShortcuts() {
+    if (this._keyboardHandler) return;
+
+    this._keyboardHandler = (e) => {
+      // Only handle if card is visible and not typing in input
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+
+      switch(e.code) {
+        case 'Space':
+          e.preventDefault();
+          this.togglePlay();
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          this.adjustVolume(5);
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          this.adjustVolume(-5);
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          this.playPrevious();
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          this.playNext();
+          break;
+      }
+    };
+
+    document.addEventListener('keydown', this._keyboardHandler);
+  }
+
+  adjustVolume(delta) {
+    const volumeSlider = this.shadowRoot.querySelector('.volume-slider');
+    if (!volumeSlider) return;
+
+    const currentVolume = parseInt(volumeSlider.value);
+    const newVolume = Math.max(0, Math.min(100, currentVolume + delta));
+    volumeSlider.value = newVolume;
+
+    this.handleVolumeChange({ target: { value: newVolume } });
   }
 
   disconnectedCallback() {
     this.stopVisualizer();
     if (this._keyboardHandler) {
       document.removeEventListener('keydown', this._keyboardHandler);
+      this._keyboardHandler = null;
     }
   }
 
@@ -490,6 +740,13 @@ class RadioBrowserCard extends HTMLElement {
   }
 
   render() {
+    const colors = this.getThemeColors();
+
+    // Get current volume from entity or use default
+    const currentVolume = this._hass && this._selectedMediaPlayer && this._hass.states[this._selectedMediaPlayer]?.attributes?.volume_level !== undefined
+      ? Math.round(this._hass.states[this._selectedMediaPlayer].attributes.volume_level * 100)
+      : 15;
+
     this.shadowRoot.innerHTML = `
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -502,26 +759,124 @@ class RadioBrowserCard extends HTMLElement {
         .winamp-container {
           display: inline-block;
           position: relative;
+          width: 100%;
+          max-width: 400px;
         }
 
-        /* Main Window - Modern dark minimalist design */
+        /* Main Window - Modern minimalist design with dynamic colors */
         .main-window {
-          width: 275px;
-          height: 116px;
-          background: #121212;
+          width: 100%;
+          min-height: 116px;
+          background: ${colors.background};
           border-radius: 8px;
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
           position: relative;
           overflow: hidden;
         }
 
+        /* Settings bar */
+        .settings-bar {
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          display: flex;
+          gap: 4px;
+          z-index: 10;
+        }
+
+        .settings-btn {
+          width: 28px;
+          height: 28px;
+          background: ${colors.surfaceLight};
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 14px;
+          color: ${colors.textSecondary};
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s;
+        }
+
+        .settings-btn:hover {
+          background: ${colors.surfaceLighter};
+          color: ${colors.text};
+          transform: scale(1.05);
+        }
+
+        .settings-btn:active {
+          transform: scale(0.95);
+        }
+
+        .settings-menu {
+          position: fixed;
+          background: ${colors.surfaceLight};
+          border-radius: 8px;
+          padding: 12px;
+          display: none;
+          min-width: 200px;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+          z-index: 1000;
+          border: 1px solid ${colors.surfaceLighter};
+        }
+
+        .settings-menu.active {
+          display: block;
+        }
+
+        .settings-group {
+          margin-bottom: 12px;
+        }
+
+        .settings-group:last-child {
+          margin-bottom: 0;
+        }
+
+        .settings-label {
+          font-size: 10px;
+          color: ${colors.textTertiary};
+          margin-bottom: 4px;
+          text-transform: uppercase;
+          font-weight: 600;
+        }
+
+        .settings-options {
+          display: flex;
+          gap: 4px;
+        }
+
+        .settings-option {
+          flex: 1;
+          padding: 6px;
+          background: ${colors.surface};
+          border: 1px solid transparent;
+          border-radius: 4px;
+          font-size: 10px;
+          color: ${colors.textSecondary};
+          cursor: pointer;
+          text-align: center;
+          transition: all 0.2s;
+        }
+
+        .settings-option:hover {
+          background: ${colors.surfaceLighter};
+          color: ${colors.text};
+        }
+
+        .settings-option.active {
+          background: ${colors.primary};
+          color: white;
+          border-color: ${colors.primary};
+        }
+
         .track-title {
           position: absolute;
           top: 12px;
           left: 12px;
-          right: 12px;
+          right: 80px;
           height: 18px;
-          color: #ffffff;
+          color: ${colors.text};
           font-size: 11px;
           font-weight: 600;
           overflow: hidden;
@@ -538,8 +893,15 @@ class RadioBrowserCard extends HTMLElement {
           left: 12px;
           width: 80px;
           height: 32px;
-          background: #181818;
+          background: ${colors.visualizerBg};
           border-radius: 4px;
+        }
+
+        @media (max-width: 400px) {
+          .visualizer {
+            width: 60px;
+            height: 28px;
+          }
         }
 
         /* Volume control */
@@ -566,7 +928,7 @@ class RadioBrowserCard extends HTMLElement {
         .volume-slider::-webkit-slider-track {
           width: 100%;
           height: 4px;
-          background: #535353;
+          background: ${colors.textTertiary};
           border-radius: 2px;
         }
 
@@ -575,7 +937,7 @@ class RadioBrowserCard extends HTMLElement {
           appearance: none;
           width: 12px;
           height: 12px;
-          background: #1DB954;
+          background: ${colors.primary};
           cursor: pointer;
           border-radius: 50%;
           transition: transform 0.2s;
@@ -588,124 +950,107 @@ class RadioBrowserCard extends HTMLElement {
         .volume-slider::-moz-range-track {
           width: 100%;
           height: 4px;
-          background: #535353;
+          background: ${colors.textTertiary};
           border-radius: 2px;
         }
 
         .volume-slider::-moz-range-thumb {
           width: 12px;
           height: 12px;
-          background: #1DB954;
+          background: ${colors.primary};
           cursor: pointer;
           border-radius: 50%;
           border: none;
         }
 
-        /* Control buttons - Modern minimalist style */
+        /* Control buttons - Modern flat style */
         .control-buttons {
           position: absolute;
           top: 38px;
           right: 12px;
           display: flex;
-          gap: 4px;
+          gap: 6px;
           align-items: center;
         }
 
+        @media (max-width: 400px) {
+          .control-buttons {
+            gap: 4px;
+          }
+        }
+
         .control-btn {
-          width: 32px;
-          height: 32px;
-          background: #282828;
-          border-radius: 50%;
+          width: 36px;
+          height: 36px;
+          background: ${colors.surfaceLight};
+          border-radius: 8px;
           border: none;
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
-          position: relative;
-          transition: all 0.2s;
+          font-size: 16px;
+          color: ${colors.textSecondary};
+          transition: all 0.15s ease;
+          font-family: system-ui, -apple-system, sans-serif;
+        }
+
+        @media (max-width: 400px) {
+          .control-btn {
+            width: 30px;
+            height: 30px;
+            font-size: 14px;
+          }
         }
 
         .control-btn:hover {
-          background: #333333;
-          transform: scale(1.05);
+          background: ${colors.surfaceLighter};
+          color: ${colors.text};
+          transform: translateY(-2px);
+          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
 
         .control-btn:active {
-          transform: scale(0.95);
-        }
-
-        /* Button icons using CSS */
-        .control-btn::before {
-          content: '';
-          width: 0;
-          height: 0;
-          border-style: solid;
-        }
-
-        .btn-prev::before {
-          border-width: 5px 7px 5px 0;
-          border-color: transparent #b3b3b3 transparent transparent;
-          margin-right: -1px;
-        }
-
-        .btn-prev::after {
-          content: '';
-          position: absolute;
-          width: 2px;
-          height: 10px;
-          background: #b3b3b3;
-          left: 11px;
+          transform: translateY(0);
+          box-shadow: none;
         }
 
         .btn-play {
-          background: #1DB954;
+          background: ${colors.primary};
+          color: white;
+          font-size: 18px;
         }
 
         .btn-play:hover {
-          background: #1ed760;
+          background: ${colors.primaryHover};
+          color: white;
+        }
+
+        /* Button icons using Unicode symbols */
+        .btn-prev::before {
+          content: '⏮';
         }
 
         .btn-play::before {
-          border-width: 6px 0 6px 10px;
-          border-color: transparent transparent transparent #ffffff;
-          margin-left: 2px;
+          content: '▶';
         }
 
         .btn-pause::before {
-          content: '';
-          width: 3px;
-          height: 12px;
-          background: #b3b3b3;
-          box-shadow: 5px 0 0 #b3b3b3;
+          content: '⏸';
         }
 
         .btn-stop::before {
-          content: '';
-          width: 10px;
-          height: 10px;
-          background: #b3b3b3;
-          border-radius: 1px;
+          content: '⏹';
         }
 
         .btn-next::before {
-          border-width: 5px 0 5px 7px;
-          border-color: transparent transparent transparent #b3b3b3;
-          margin-left: 1px;
-        }
-
-        .btn-next::after {
-          content: '';
-          position: absolute;
-          width: 2px;
-          height: 10px;
-          background: #b3b3b3;
-          right: 11px;
+          content: '⏭';
         }
 
         /* Playlist Window - Modern minimalist design */
         .playlist-window {
-          width: 275px;
-          background: #121212;
+          width: 100%;
+          background: ${colors.background};
           border-radius: 8px;
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
           position: relative;
@@ -716,14 +1061,38 @@ class RadioBrowserCard extends HTMLElement {
         /* Search controls at top */
         .playlist-controls {
           padding: 12px;
-          background: #181818;
+          background: ${colors.surface};
         }
 
-        .player-select, .country-select, .search-input {
+        .search-input {
           width: 100%;
           height: 36px;
-          background: #282828;
-          color: #ffffff;
+          background: ${colors.surfaceLight};
+          color: ${colors.text};
+          border: 1px solid transparent;
+          border-radius: 4px;
+          font-size: 12px;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          padding: 8px 12px;
+          margin-bottom: 8px;
+          transition: all 0.2s;
+        }
+
+        .search-input:focus {
+          outline: none;
+          border-color: ${colors.primary};
+          background: ${colors.surfaceLighter};
+        }
+
+        .search-input::placeholder {
+          color: ${colors.textTertiary};
+        }
+
+        .player-select, .country-select {
+          width: 100%;
+          height: 36px;
+          background: ${colors.surfaceLight};
+          color: ${colors.text};
           border: none;
           border-radius: 4px;
           font-size: 12px;
@@ -734,33 +1103,32 @@ class RadioBrowserCard extends HTMLElement {
           transition: background 0.2s;
         }
 
-        .search-input {
-          cursor: text;
+        .player-select:hover, .country-select:hover {
+          background: ${colors.surfaceLighter};
         }
 
-        .search-input::placeholder {
-          color: #535353;
-        }
-
-        .player-select:hover, .country-select:hover, .search-input:hover {
-          background: #333333;
-        }
-
-        .player-select:focus, .country-select:focus, .search-input:focus {
-          outline: 2px solid #1DB954;
+        .player-select:focus, .country-select:focus {
+          outline: 2px solid ${colors.primary};
           outline-offset: -2px;
         }
 
         .player-select option, .country-select option {
-          background: #282828;
-          color: #ffffff;
+          background: ${colors.surfaceLight};
+          color: ${colors.text};
         }
 
         /* Playlist body */
         .playlist-body {
-          height: 150px;
-          background: #121212;
+          min-height: 150px;
+          max-height: 400px;
+          background: ${colors.background};
           position: relative;
+        }
+
+        @media (max-width: 600px) {
+          .playlist-body {
+            max-height: 300px;
+          }
         }
 
         /* Playlist area */
@@ -770,7 +1138,7 @@ class RadioBrowserCard extends HTMLElement {
           left: 0;
           right: 0;
           bottom: 0;
-          overflow-y: scroll;
+          overflow-y: auto;
           overflow-x: hidden;
           padding: 8px;
         }
@@ -780,16 +1148,16 @@ class RadioBrowserCard extends HTMLElement {
         }
 
         .playlist-display::-webkit-scrollbar-track {
-          background: #121212;
+          background: ${colors.background};
         }
 
         .playlist-display::-webkit-scrollbar-thumb {
-          background: #282828;
+          background: ${colors.surfaceLight};
           border-radius: 4px;
         }
 
         .playlist-display::-webkit-scrollbar-thumb:hover {
-          background: #333333;
+          background: ${colors.surfaceLighter};
         }
 
         .playlist-items {
@@ -798,7 +1166,7 @@ class RadioBrowserCard extends HTMLElement {
 
         /* Modern playlist item styling */
         .playlist-item {
-          color: #b3b3b3;
+          color: ${colors.textSecondary};
           background: transparent;
           font-size: 11px;
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -806,29 +1174,29 @@ class RadioBrowserCard extends HTMLElement {
           cursor: pointer;
           display: flex;
           gap: 8px;
-          white-space: nowrap;
+          align-items: center;
           border-radius: 4px;
           margin-bottom: 2px;
           transition: all 0.2s;
         }
 
         .playlist-item:hover {
-          background: #282828;
-          color: #ffffff;
+          background: ${colors.surfaceLight};
+          color: ${colors.text};
         }
 
         .playlist-item.selected {
-          background: #282828;
-          color: #ffffff;
+          background: ${colors.surfaceLight};
+          color: ${colors.text};
         }
 
         .playlist-item.current {
-          color: #1DB954;
-          background: #181818;
+          color: ${colors.primary};
+          background: ${colors.surface};
         }
 
         .item-number {
-          color: #535353;
+          color: ${colors.textTertiary};
           min-width: 24px;
           font-size: 10px;
         }
@@ -837,13 +1205,63 @@ class RadioBrowserCard extends HTMLElement {
           flex: 1;
           overflow: hidden;
           text-overflow: ellipsis;
+          white-space: nowrap;
           color: inherit;
+        }
+
+        .favorite-icon {
+          color: ${colors.textTertiary};
+          font-size: 14px;
+          cursor: pointer;
+          padding: 4px;
+          border-radius: 4px;
+          transition: all 0.2s;
+          user-select: none;
+        }
+
+        .favorite-icon:hover {
+          color: ${colors.primary};
+          background: ${colors.surfaceLight};
+          transform: scale(1.2);
+        }
+
+        .favorite-icon.active {
+          color: ${colors.primary};
         }
       </style>
 
       <div class="winamp-container">
         <!-- Main Player Window -->
         <div class="main-window">
+          <!-- Settings Bar -->
+          <div class="settings-bar">
+            <button class="settings-btn" onclick="this.getRootNode().host.toggleSettings(event)" title="Settings">⚙</button>
+            <div class="settings-menu" id="settings-menu">
+              <div class="settings-group">
+                <div class="settings-label">Theme</div>
+                <div class="settings-options">
+                  <button class="settings-option ${this._theme === 'dark' ? 'active' : ''}"
+                          onclick="this.getRootNode().host.setTheme('dark')">Dark</button>
+                  <button class="settings-option ${this._theme === 'light' ? 'active' : ''}"
+                          onclick="this.getRootNode().host.setTheme('light')">Light</button>
+                  <button class="settings-option ${this._theme === 'custom' ? 'active' : ''}"
+                          onclick="this.getRootNode().host.setTheme('custom')">Custom</button>
+                </div>
+              </div>
+              <div class="settings-group">
+                <div class="settings-label">Visualizer</div>
+                <div class="settings-options">
+                  <button class="settings-option ${this._visualizerStyle === 'bars' ? 'active' : ''}"
+                          onclick="this.getRootNode().host.setVisualizerStyle('bars')">Bars</button>
+                  <button class="settings-option ${this._visualizerStyle === 'waveform' ? 'active' : ''}"
+                          onclick="this.getRootNode().host.setVisualizerStyle('waveform')">Wave</button>
+                  <button class="settings-option ${this._visualizerStyle === 'circle' ? 'active' : ''}"
+                          onclick="this.getRootNode().host.setVisualizerStyle('circle')">Circle</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="track-title">Radio Browser</div>
 
           <!-- Visualizer -->
@@ -852,7 +1270,7 @@ class RadioBrowserCard extends HTMLElement {
           <!-- Control Buttons -->
           <div class="control-buttons">
             <button class="control-btn btn-prev" onclick="this.getRootNode().host.playPrevious()" title="Previous (←)"></button>
-            <button class="control-btn btn-play" onclick="this.getRootNode().host.togglePlay()" title="Play/Pause (Space)"></button>
+            <button class="control-btn btn-play" onclick="this.getRootNode().host.togglePlay()" title="Play (Space)"></button>
             <button class="control-btn btn-pause" onclick="this.getRootNode().host.togglePlay()" title="Pause (Space)"></button>
             <button class="control-btn btn-stop" onclick="this.getRootNode().host.stop()" title="Stop"></button>
             <button class="control-btn btn-next" onclick="this.getRootNode().host.playNext()" title="Next (→)"></button>
@@ -860,8 +1278,9 @@ class RadioBrowserCard extends HTMLElement {
 
           <!-- Volume Control -->
           <div class="volume-control">
-            <input type="range" class="volume-slider" min="0" max="100" value="15"
-                   oninput="this.getRootNode().host.handleVolumeChange(event)">
+            <input type="range" class="volume-slider" min="0" max="100" value="${currentVolume}"
+                   oninput="this.getRootNode().host.handleVolumeChange(event)"
+                   title="Volume (↑↓)">
           </div>
         </div>
 
@@ -869,14 +1288,15 @@ class RadioBrowserCard extends HTMLElement {
         <div class="playlist-window">
           <!-- Search controls -->
           <div class="playlist-controls">
+            <input type="text" class="search-input" placeholder="🔍 Search stations..."
+                   value="${this._searchQuery}"
+                   oninput="this.getRootNode().host.handleSearchInput(event)">
             <select class="player-select" onchange="this.getRootNode().host.handleMediaPlayerChange(event)">
               <option value="">Select Player...</option>
             </select>
             <select class="country-select" onchange="this.getRootNode().host.handleCountryChange(event)">
               <option value="">Select Country...</option>
             </select>
-            <input type="text" class="search-input" placeholder="🔍 Search stations..."
-                   oninput="this.getRootNode().host.handleSearchInput(event)">
           </div>
 
           <!-- Playlist body -->
@@ -890,51 +1310,54 @@ class RadioBrowserCard extends HTMLElement {
     `;
 
     this.setupEventListeners();
-  }
+    this.setupKeyboardShortcuts();
 
-  setupEventListeners() {
-    // Add keyboard shortcuts (only once)
-    if (!this._keyboardListenerAdded) {
-      this._keyboardHandler = (e) => {
-        // Don't trigger if user is typing in an input field
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-
-        switch(e.key) {
-          case ' ': // Space - Play/Pause
-            e.preventDefault();
-            this.togglePlay();
-            break;
-          case 'ArrowLeft': // Left arrow - Previous
-            e.preventDefault();
-            this.playPrevious();
-            break;
-          case 'ArrowRight': // Right arrow - Next
-            e.preventDefault();
-            this.playNext();
-            break;
-          case 'ArrowUp': // Up arrow - Volume up
-            e.preventDefault();
-            this.adjustVolume(5);
-            break;
-          case 'ArrowDown': // Down arrow - Volume down
-            e.preventDefault();
-            this.adjustVolume(-5);
-            break;
-        }
-      };
-      document.addEventListener('keydown', this._keyboardHandler);
-      this._keyboardListenerAdded = true;
+    // Restore state after re-render
+    if (this._mediaPlayers.length > 0) {
+      this.updatePlayerSelect();
+    }
+    if (this._countries.length > 0) {
+      this.updateCountrySelect();
+    }
+    if (this._stations.length > 0 || this._favorites.length > 0) {
+      this.updatePlaylist();
+    }
+    if (this._hass && this._selectedMediaPlayer) {
+      this.updateDisplay();
     }
   }
 
-  adjustVolume(delta) {
-    const volumeSlider = this.shadowRoot.querySelector('.volume-slider');
-    if (volumeSlider) {
-      const newValue = Math.max(0, Math.min(100, parseInt(volumeSlider.value) + delta));
-      volumeSlider.value = newValue;
-      this.handleVolumeChange({ target: { value: newValue } });
+  toggleSettings(e) {
+    e.stopPropagation();
+    const menu = this.shadowRoot.querySelector('.settings-menu');
+    const btn = e.currentTarget;
+
+    if (menu) {
+      const isActive = menu.classList.contains('active');
+
+      if (!isActive) {
+        // Calculate position
+        const btnRect = btn.getBoundingClientRect();
+        menu.style.top = `${btnRect.bottom + 4}px`;
+        menu.style.right = `${window.innerWidth - btnRect.right}px`;
+        menu.classList.add('active');
+
+        // Close menu when clicking outside
+        const closeHandler = (event) => {
+          const path = event.composedPath();
+          if (!path.includes(menu) && !path.includes(btn)) {
+            menu.classList.remove('active');
+            document.removeEventListener('click', closeHandler);
+          }
+        };
+        setTimeout(() => document.addEventListener('click', closeHandler), 0);
+      } else {
+        menu.classList.remove('active');
+      }
     }
   }
+
+  setupEventListeners() {}
 
   static getConfigElement() {
     return document.createElement("radio-browser-card-editor");
