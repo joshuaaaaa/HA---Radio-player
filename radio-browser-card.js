@@ -472,15 +472,15 @@ class RadioBrowserCard extends HTMLElement {
       const entity = this._hass.states[this._selectedMediaPlayer];
       const isBrowserPlayer = entity && entity.entity_id && entity.entity_id.includes('browser');
 
-      // Set safe default volume (15%) before playing if volume is too high or not set
+      // Set safe default volume (10%) before playing if volume is too high or not set
       if (entity && (entity.attributes.volume_level === undefined || entity.attributes.volume_level > 0.3)) {
         await this._hass.callService('media_player', 'volume_set', {
           entity_id: this._selectedMediaPlayer,
-          volume_level: 0.15
+          volume_level: 0.10
         });
         // Update slider to reflect safe volume
         const volumeSlider = this.shadowRoot.querySelector('.volume-slider');
-        if (volumeSlider) volumeSlider.value = 15;
+        if (volumeSlider) volumeSlider.value = 10;
       }
 
       console.log('Playing station:', station.title, 'ID:', station.media_content_id);
@@ -995,7 +995,7 @@ class RadioBrowserCard extends HTMLElement {
     // Get current volume from entity or use default
     const currentVolume = this._hass && this._selectedMediaPlayer && this._hass.states[this._selectedMediaPlayer]?.attributes?.volume_level !== undefined
       ? Math.round(this._hass.states[this._selectedMediaPlayer].attributes.volume_level * 100)
-      : 15;
+      : 10;
 
     this.shadowRoot.innerHTML = `
       <style>
