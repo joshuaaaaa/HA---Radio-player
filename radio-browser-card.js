@@ -23,6 +23,7 @@ class RadioBrowserCard extends HTMLElement {
     this._sleepTimerInterval = null;
     this._sleepTimerMinutes = 0;
     this._currentStationMetadata = null;
+    this._customStations = this.loadCustomStations();
 
     // Restore state after page reload
     this._restoreState();
@@ -66,6 +67,126 @@ class RadioBrowserCard extends HTMLElement {
       localStorage.setItem('radio_favorites', JSON.stringify(this._favorites));
     } catch (e) {
       console.error('Error saving favorites:', e);
+    }
+  }
+
+  // Custom stations management (YouTube, MP3)
+  loadCustomStations() {
+    try {
+      const stored = localStorage.getItem('radio_custom_stations');
+      return stored ? JSON.parse(stored) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  saveCustomStations() {
+    try {
+      localStorage.setItem('radio_custom_stations', JSON.stringify(this._customStations));
+    } catch (e) {
+      console.error('Error saving custom stations:', e);
+    }
+  }
+
+  // YouTube URL handling
+  parseYouTubeUrl(url) {
+    // Support various YouTube URL formats
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+      /^([a-zA-Z0-9_-]{11})$/ // Direct video ID
+    ];
+
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match) return match[1];
+    }
+    return null;
+  }
+
+  addYouTubeUrl() {
+    const url = prompt('Enter YouTube URL or Video ID:');
+    if (!url) return;
+
+    const videoId = this.parseYouTubeUrl(url.trim());
+    if (!videoId) {
+      alert('Invalid YouTube URL. Please enter a valid YouTube link or video ID.');
+      return;
+    }
+
+    const title = prompt('Enter a name for this station:', `YouTube: ${videoId}`);
+    if (!title) return;
+
+    const station = {
+      title: title,
+      media_content_id: `https://www.youtube.com/watch?v=${videoId}`,
+      media_content_type: 'music',
+      source: 'youtube',
+      can_play: true
+    };
+
+    this._customStations.push(station);
+    this.saveCustomStations();
+    this.refreshStationList();
+    alert('YouTube station added successfully!');
+  }
+
+  // Local MP3 file handling
+  addLocalMP3() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'audio/mp3,audio/mpeg,audio/*';
+    input.multiple = true;
+
+    input.onchange = (e) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+
+      for (const file of files) {
+        // Create a URL for the file
+        const fileUrl = URL.createObjectURL(file);
+
+        const station = {
+          title: file.name.replace(/\.[^/.]+$/, ''), // Remove extension
+          media_content_id: fileUrl,
+          media_content_type: 'audio/mpeg',
+          source: 'local_mp3',
+          can_play: true,
+          fileName: file.name
+        };
+
+        this._customStations.push(station);
+      }
+
+      this.saveCustomStations();
+      this.refreshStationList();
+      alert(`Added ${files.length} MP3 file(s) successfully!`);
+    };
+
+    input.click();
+  }
+
+  // Refresh station list to include custom stations
+  refreshStationList() {
+    // If we have a country selected, reload stations from that country
+    if (this._selectedCountry) {
+      this.loadStationsByCountry(this._selectedCountry);
+    } else {
+      // Otherwise just show custom stations and favorites
+      this.updatePlaylist();
+    }
+  }
+
+  // Remove custom station
+  removeCustomStation(station) {
+    const index = this._customStations.findIndex(s => s.media_content_id === station.media_content_id);
+    if (index >= 0) {
+      // Revoke object URL if it's a local file
+      if (station.source === 'local_mp3') {
+        URL.revokeObjectURL(station.media_content_id);
+      }
+      this._customStations.splice(index, 1);
+      this.saveCustomStations();
+      this.refreshStationList();
     }
   }
 
@@ -281,8 +402,8 @@ class RadioBrowserCard extends HTMLElement {
   }
 
   getFilteredStations() {
-    // If no country selected, show favorites
-    let stations = this._stations.length > 0 ? this._stations : this._favorites;
+    // If no country selected, show custom stations and favorites
+    let stations = this._stations.length > 0 ? this._stations : [...this._customStations, ...this._favorites];
 
     if (this._searchQuery) {
       stations = stations.filter(station =>
@@ -413,7 +534,6 @@ class RadioBrowserCard extends HTMLElement {
   async loadStationsByCountry(countryId) {
     if (!this._hass || !this._selectedMediaPlayer || !countryId) return;
 
-    this._stations = [];
     this.updatePlaylist();
 
     try {
@@ -425,7 +545,9 @@ class RadioBrowserCard extends HTMLElement {
       });
 
       if (result && result.children) {
-        this._stations = result.children.filter(item => item.can_play || !item.children);
+        const radioStations = result.children.filter(item => item.can_play || !item.children);
+        // Merge radio stations with custom stations
+        this._stations = [...radioStations, ...this._customStations];
         this.updatePlaylist();
       }
     } catch (error) {
@@ -483,13 +605,27 @@ class RadioBrowserCard extends HTMLElement {
         if (volumeSlider) volumeSlider.value = 10;
       }
 
-      console.log('Playing station:', station.title, 'ID:', station.media_content_id);
+      console.log('Playing station:', station.title, 'ID:', station.media_content_id, 'Type:', station.media_content_type);
+
+      // Determine the correct media_content_type based on source
+      let contentType = station.media_content_type;
+      let contentId = station.media_content_id;
+
+      // For YouTube, use specific content type if available
+      if (station.source === 'youtube') {
+        // Home Assistant supports YouTube URLs directly
+        contentType = station.media_content_type || 'music';
+      } else if (station.source === 'local_mp3') {
+        // For local MP3 files (blob URLs), we need special handling
+        // Try to use the blob URL directly
+        contentType = 'audio/mpeg';
+      }
 
       // Call play_media service
       await this._hass.callService('media_player', 'play_media', {
         entity_id: this._selectedMediaPlayer,
-        media_content_id: station.media_content_id,
-        media_content_type: station.media_content_type
+        media_content_id: contentId,
+        media_content_type: contentType
       });
 
       this._currentStationIndex = index;
@@ -500,6 +636,7 @@ class RadioBrowserCard extends HTMLElement {
       this._currentStationMetadata = {
         title: station.title,
         media_content_id: station.media_content_id,
+        source: station.source || 'radio',
         // Extract additional metadata if available
         bitrate: this.extractBitrate(station),
         codec: this.extractCodec(station),
@@ -522,6 +659,7 @@ class RadioBrowserCard extends HTMLElement {
       }, waitTime);
     } catch (error) {
       console.error('Error playing station:', error);
+      alert(`Error playing ${station.source === 'local_mp3' ? 'local MP3' : station.source === 'youtube' ? 'YouTube' : 'station'}: ${error.message}\n\nNote: YouTube and local MP3 playback require compatible media players (e.g., browser_mod, media_player.vlc).`);
       // Reset state on error
       this._isPlaying = false;
       this.stopVisualizer();
@@ -565,6 +703,14 @@ class RadioBrowserCard extends HTMLElement {
     if (!infoEl || !this._currentStationMetadata) return;
 
     const parts = [];
+
+    // Show source for custom stations
+    if (this._currentStationMetadata.source === 'youtube') {
+      parts.push('▶️ YouTube');
+    } else if (this._currentStationMetadata.source === 'local_mp3') {
+      parts.push('🎵 Local MP3');
+    }
+
     if (this._currentStationMetadata.country) {
       parts.push(`📍 ${this._currentStationMetadata.country}`);
     }
@@ -699,13 +845,17 @@ class RadioBrowserCard extends HTMLElement {
       if (actualIndex === this._currentStationIndex) classes.push('current');
       if (actualIndex === this._selectedStationIndex) classes.push('selected');
       const isFav = this.isFavorite(station);
+      const isCustom = station.source === 'youtube' || station.source === 'local_mp3';
+      const sourceBadge = station.source === 'youtube' ? '▶️' : (station.source === 'local_mp3' ? '🎵' : '');
 
       return `
         <div class="playlist-item ${classes.join(' ')}"
              data-index="${actualIndex}"
              data-is-favorite="${showingFavorites}">
           <span class="item-number">${(displayIndex + 1)}.</span>
+          ${sourceBadge ? `<span class="source-badge">${sourceBadge}</span>` : ''}
           <span class="item-title">${this.escapeHtml(station.title)}</span>
+          ${isCustom ? '<span class="remove-icon" data-station-index="' + actualIndex + '">🗑️</span>' : ''}
           <span class="favorite-icon ${isFav ? 'active' : ''}" data-station-index="${actualIndex}">★</span>
         </div>
       `;
@@ -714,6 +864,7 @@ class RadioBrowserCard extends HTMLElement {
     // Add event listeners
     playlistEl.querySelectorAll('.playlist-item').forEach(item => {
       const starBtn = item.querySelector('.favorite-icon');
+      const removeBtn = item.querySelector('.remove-icon');
       const index = parseInt(item.dataset.index);
       const isFavoriteList = item.dataset.isFavorite === 'true';
       const sourceList = isFavoriteList ? this._favorites : this._stations;
@@ -723,6 +874,16 @@ class RadioBrowserCard extends HTMLElement {
         starBtn.addEventListener('click', (e) => {
           e.stopPropagation();
           this.toggleFavorite(sourceList[index]);
+        });
+      }
+
+      // Remove custom station
+      if (removeBtn) {
+        removeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (confirm('Remove this station?')) {
+            this.removeCustomStation(sourceList[index]);
+          }
         });
       }
 
@@ -1419,6 +1580,41 @@ class RadioBrowserCard extends HTMLElement {
           color: ${colors.text};
         }
 
+        /* Custom source buttons */
+        .custom-sources {
+          display: flex;
+          gap: 8px;
+          margin-top: 8px;
+        }
+
+        .custom-source-btn {
+          flex: 1;
+          height: 32px;
+          background: ${colors.surfaceLight};
+          color: ${colors.text};
+          border: 1px solid ${colors.surfaceLighter};
+          border-radius: 4px;
+          font-size: 11px;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          cursor: pointer;
+          transition: all 0.2s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+        }
+
+        .custom-source-btn:hover {
+          background: ${colors.surfaceLighter};
+          border-color: ${colors.primary};
+          color: ${colors.primary};
+          transform: translateY(-1px);
+        }
+
+        .custom-source-btn:active {
+          transform: translateY(0);
+        }
+
         /* Playlist body */
         .playlist-body {
           min-height: 150px;
@@ -1511,6 +1707,29 @@ class RadioBrowserCard extends HTMLElement {
           color: inherit;
         }
 
+        .source-badge {
+          font-size: 12px;
+          margin-right: 4px;
+          user-select: none;
+        }
+
+        .remove-icon {
+          color: ${colors.textTertiary};
+          font-size: 12px;
+          cursor: pointer;
+          padding: 4px;
+          border-radius: 4px;
+          transition: all 0.2s;
+          user-select: none;
+          margin-left: 4px;
+        }
+
+        .remove-icon:hover {
+          color: #ff4444;
+          background: ${colors.surfaceLight};
+          transform: scale(1.2);
+        }
+
         .favorite-icon {
           color: ${colors.textTertiary};
           font-size: 14px;
@@ -1519,6 +1738,7 @@ class RadioBrowserCard extends HTMLElement {
           border-radius: 4px;
           transition: all 0.2s;
           user-select: none;
+          margin-left: 4px;
         }
 
         .favorite-icon:hover {
@@ -1572,6 +1792,17 @@ class RadioBrowserCard extends HTMLElement {
             <select class="country-select" onchange="this.getRootNode().host.handleCountryChange(event)">
               <option value="">Select Country...</option>
             </select>
+            <!-- Custom source buttons -->
+            <div class="custom-sources">
+              <button class="custom-source-btn" onclick="this.getRootNode().host.addYouTubeUrl()" title="Add YouTube URL">
+                <span>▶️</span>
+                <span>YouTube</span>
+              </button>
+              <button class="custom-source-btn" onclick="this.getRootNode().host.addLocalMP3()" title="Add local MP3 files">
+                <span>🎵</span>
+                <span>MP3 Files</span>
+              </button>
+            </div>
           </div>
 
           <!-- Playlist body -->
