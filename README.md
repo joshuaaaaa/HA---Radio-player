@@ -32,6 +32,10 @@ A modern **radio player card** for Home Assistant! Browse and play internet radi
 - ⏲️ **Sleep Timer** - Auto-stop playback after 15, 30, or 60 minutes
 - 💾 **State Persistence** - Survives page reloads without losing your selection
 - 💫 **Smooth Animations** - Hover effects, scale transforms, and transitions throughout
+- ▶️ **YouTube Playback** - Play YouTube videos as audio (requires VLC/Kodi/Plex media player)
+- 🎵 **Local MP3 Files** - Upload and play MP3 files directly in browser (persistent storage)
+- 🌐 **Custom Audio Streams** - Add direct HTTP/HTTPS audio stream URLs
+- 🗑️ **Delete Custom Stations** - Remove uploaded MP3s, YouTube links, or custom streams
 
 ## 📋 Requirements
 
@@ -169,12 +173,87 @@ Use the search box to filter stations by name in real-time:
 - **Import**: Click 📥 Import to restore from JSON file
 - Share favorites between devices or create backups
 
-### 13. Station Information
+### 13. YouTube Playback
+
+Add YouTube videos to play as audio stations:
+
+1. **Click the ▶️ YouTube button** in the playlist section
+2. **Choose "OK"** when prompted
+3. **Enter YouTube URL or Video ID**:
+   - Full URL: `https://www.youtube.com/watch?v=dQw4w9WgXcQ`
+   - Short URL: `https://youtu.be/dQw4w9WgXcQ`
+   - Video ID only: `dQw4w9WgXcQ`
+4. **Name your station** (e.g., "Relaxing Jazz")
+5. **Play through Home Assistant media player**
+
+**⚠️ IMPORTANT:** YouTube playback requires a media player with YouTube support:
+- ✅ **VLC media player** (recommended)
+- ✅ **Kodi**
+- ✅ **Plex**
+- ✅ **Cast devices** (Chromecast)
+- ❌ **NOT supported:** browser_mod, simple audio players
+
+The card will warn you if your selected media player may not support YouTube.
+
+### 14. Local MP3 Files
+
+Upload MP3 files to play directly in your browser:
+
+1. **Click the 🎵 MP3 Files button** in the playlist section
+2. **Select one or more MP3 files** from your device
+3. Files are **converted to base64** and saved in browser localStorage
+4. **Play directly** without Home Assistant media player
+5. **Works after page reload** - files persist in browser storage
+
+**Features:**
+- ✅ Multiple file selection
+- ✅ Persistent storage (survives page reload)
+- ✅ Direct browser playback
+- ✅ No file size limit (browser dependent)
+- ✅ Works offline once loaded
+
+**Note:** Large files may take a moment to load initially.
+
+### 15. Custom Audio Streams
+
+Add direct HTTP/HTTPS audio stream URLs:
+
+1. **Click the ▶️ YouTube button** in the playlist section
+2. **Choose "Cancel"** when prompted
+3. **Enter direct audio stream URL**:
+   - Example: `http://stream.example.com/radio.mp3`
+   - Example: `https://ice1.somafm.com/groovesalad-128-mp3`
+4. **Name your station**
+5. **Play directly** in browser
+
+**Perfect for:**
+- Internet radio streams
+- Podcasts with direct URLs
+- Any HTTP/HTTPS audio stream
+
+### 16. Delete Custom Stations
+
+Remove uploaded MP3 files, YouTube links, or custom streams:
+
+1. **Find the station** in your playlist
+2. **Click the 🗑️ trash icon** next to the station name
+3. **Confirm deletion** in the dialog
+4. Station is permanently removed
+
+**Visual indicators:**
+- ▶️ = YouTube station
+- 🎵 = Local MP3 file
+- 🌐 = Custom audio stream
+
+### 17. Station Information
 
 While playing, you'll see station metadata below the title:
 - 📍 **Country** - Station's country of origin
 - 🎵 **Codec** - Audio format (MP3, AAC, OGG, FLAC)
 - 📊 **Bitrate** - Stream quality in kbps
+- ▶️ **YouTube** - Playing from YouTube
+- 🎵 **Local MP3** - Playing local file
+- 🌐 **Custom Stream** - Playing custom stream
 
 ## 🎨 Design Details
 
@@ -238,6 +317,7 @@ entity: media_player.bedroom
 
 ## 🔧 Compatible Media Players
 
+### For Radio Stations
 Works with any media player supporting URL streaming:
 
 - ✅ Google Cast / Chromecast
@@ -247,6 +327,25 @@ Works with any media player supporting URL streaming:
 - ✅ Spotify Connect
 - ✅ Browser Mod
 - ✅ And many more!
+
+### For YouTube Playback
+**Requires** media player with YouTube support:
+
+- ✅ **VLC Media Player** (recommended)
+- ✅ **Kodi**
+- ✅ **Plex**
+- ✅ **Cast devices** (Chromecast with YouTube support)
+- ✅ **MPV**
+- ✅ **Mopidy** (with YouTube plugin)
+- ❌ **NOT supported:** browser_mod, simple audio-only players
+
+### For Local MP3 & Custom Streams
+Plays **directly in browser** - no media player needed:
+
+- ✅ Works in any modern browser
+- ✅ Chrome, Firefox, Safari, Edge
+- ✅ Mobile browsers supported
+- ✅ No Home Assistant media player required
 
 ## 🐛 Troubleshooting
 
@@ -271,6 +370,38 @@ Works with any media player supporting URL streaming:
 3. Try a different station
 4. Check Home Assistant logs for errors
 
+### YouTube doesn't play
+
+1. **Check media player compatibility** - YouTube requires VLC/Kodi/Plex/Cast
+2. **NOT compatible** with browser_mod or simple audio players
+3. Card will warn you if player doesn't support YouTube
+4. Try with VLC media player (most reliable)
+5. Check Home Assistant logs for YouTube-related errors
+
+### Local MP3 doesn't play
+
+1. **Check file format** - must be valid MP3 file
+2. **Browser compatibility** - works in Chrome, Firefox, Safari, Edge
+3. **File size** - very large files may cause browser issues
+4. **Clear browser cache** if file doesn't load
+5. **Check browser console** (F12) for errors
+6. Try with a smaller MP3 file first
+
+### Custom stream doesn't play
+
+1. **Verify stream URL** - must be direct HTTP/HTTPS audio URL
+2. **Check CORS** - stream must allow browser access
+3. **Try in browser** - paste URL directly in browser to test
+4. **Check format** - MP3 streams work best
+5. Some streams may require authentication
+
+### Can't delete custom station
+
+1. **Look for trash icon** (🗑️) - only visible on custom stations
+2. **Not visible** on radio browser stations (they can't be deleted)
+3. **Refresh page** if button doesn't respond
+4. Check browser console for JavaScript errors
+
 ## 📚 Technical Details
 
 ### How It Works
@@ -280,13 +411,48 @@ Works with any media player supporting URL streaming:
 - Browses stations by country to optimize loading
 - Displays filtered stations in the playlist
 
-**Playback:**
+**Radio Station Playback:**
 ```javascript
 hass.callService('media_player', 'play_media', {
   entity_id: 'media_player.speaker',
   media_content_id: 'media-source://radio_browser/[uuid]',
   media_content_type: 'audio/mpeg'
 })
+```
+
+**YouTube Playback:**
+```javascript
+// Sent to Home Assistant media player (VLC/Kodi/Plex required)
+hass.callService('media_player', 'play_media', {
+  entity_id: 'media_player.vlc',
+  media_content_id: 'https://www.youtube.com/watch?v=VIDEO_ID',
+  media_content_type: 'music'
+})
+```
+
+**Local MP3 & Custom Streams:**
+```javascript
+// Direct browser playback using HTML5 Audio element
+const audio = document.createElement('audio');
+audio.src = 'data:audio/mpeg;base64,BASE64_DATA'; // For MP3 files
+// OR
+audio.src = 'https://stream.example.com/radio.mp3'; // For custom streams
+audio.play();
+```
+
+**File Storage:**
+- **MP3 Files**: Converted to base64 data URLs using FileReader API
+- **Stored in**: Browser localStorage (persistent across page reloads)
+- **Custom Stations**: Saved as JSON in localStorage
+- **Format**:
+```javascript
+{
+  title: "My Song",
+  media_content_id: "data:audio/mpeg;base64,//uQx...",
+  media_content_type: "audio/mpeg",
+  source: "local_mp3",
+  fileName: "song.mp3"
+}
 ```
 
 ### Key Features
