@@ -24,6 +24,8 @@ class RadioBrowserCard extends HTMLElement {
     this._sleepTimerMinutes = 0;
     this._currentStationMetadata = null;
     this._customStations = this.loadCustomStations();
+    this._audioElement = null;
+    this._isUsingDirectPlayback = false;
 
     // Restore state after page reload
     this._restoreState();
@@ -104,30 +106,55 @@ class RadioBrowserCard extends HTMLElement {
   }
 
   addYouTubeUrl() {
-    const url = prompt('Enter YouTube URL or Video ID:');
-    if (!url) return;
+    const choice = confirm('Do you want to add a YouTube URL?\n\nYes = YouTube URL (requires Home Assistant media player with YouTube support)\nNo = Direct audio stream URL (for any media player)');
 
-    const videoId = this.parseYouTubeUrl(url.trim());
-    if (!videoId) {
-      alert('Invalid YouTube URL. Please enter a valid YouTube link or video ID.');
-      return;
+    if (choice) {
+      // YouTube URL mode
+      const url = prompt('Enter YouTube URL or Video ID:');
+      if (!url) return;
+
+      const videoId = this.parseYouTubeUrl(url.trim());
+      if (!videoId) {
+        alert('Invalid YouTube URL. Please enter a valid YouTube link or video ID.');
+        return;
+      }
+
+      const title = prompt('Enter a name for this station:', `YouTube: ${videoId}`);
+      if (!title) return;
+
+      const station = {
+        title: title,
+        media_content_id: `https://www.youtube.com/watch?v=${videoId}`,
+        media_content_type: 'music',
+        source: 'youtube',
+        can_play: true
+      };
+
+      this._customStations.push(station);
+      this.saveCustomStations();
+      this.refreshStationList();
+      alert('YouTube station added successfully!\n\nNote: This will be played through Home Assistant media player. Make sure your media player supports YouTube playback.');
+    } else {
+      // Direct audio stream URL mode
+      const url = prompt('Enter direct audio stream URL (e.g., http://stream.example.com/audio.mp3):');
+      if (!url || !url.trim()) return;
+
+      const title = prompt('Enter a name for this station:', 'Custom Stream');
+      if (!title) return;
+
+      const station = {
+        title: title,
+        media_content_id: url.trim(),
+        media_content_type: 'audio/mpeg',
+        source: 'custom_stream',
+        can_play: true
+      };
+
+      this._customStations.push(station);
+      this.saveCustomStations();
+      this.refreshStationList();
+      alert('Audio stream added successfully!');
     }
-
-    const title = prompt('Enter a name for this station:', `YouTube: ${videoId}`);
-    if (!title) return;
-
-    const station = {
-      title: title,
-      media_content_id: `https://www.youtube.com/watch?v=${videoId}`,
-      media_content_type: 'music',
-      source: 'youtube',
-      can_play: true
-    };
-
-    this._customStations.push(station);
-    this.saveCustomStations();
-    this.refreshStationList();
-    alert('YouTube station added successfully!');
   }
 
   // Local MP3 file handling
@@ -180,8 +207,8 @@ class RadioBrowserCard extends HTMLElement {
   removeCustomStation(station) {
     const index = this._customStations.findIndex(s => s.media_content_id === station.media_content_id);
     if (index >= 0) {
-      // Revoke object URL if it's a local file
-      if (station.source === 'local_mp3') {
+      // Revoke object URL if it's a local file (blob URLs)
+      if (station.source === 'local_mp3' && station.media_content_id.startsWith('blob:')) {
         URL.revokeObjectURL(station.media_content_id);
       }
       this._customStations.splice(index, 1);
@@ -582,13 +609,20 @@ class RadioBrowserCard extends HTMLElement {
   }
 
   async playStation(station, index) {
-    if (!this._hass || !this._selectedMediaPlayer) return;
-
     // Validate station object
     if (!station || !station.media_content_id) {
       console.error('Invalid station object:', station);
       return;
     }
+
+    // For local MP3 and custom streams, use direct browser playback
+    if (station.source === 'local_mp3' || station.source === 'custom_stream') {
+      this.playDirectInBrowser(station, index);
+      return;
+    }
+
+    // For YouTube and radio stations, use Home Assistant media player
+    if (!this._hass || !this._selectedMediaPlayer) return;
 
     try {
       const entity = this._hass.states[this._selectedMediaPlayer];
@@ -607,26 +641,18 @@ class RadioBrowserCard extends HTMLElement {
 
       console.log('Playing station:', station.title, 'ID:', station.media_content_id, 'Type:', station.media_content_type);
 
-      // Determine the correct media_content_type based on source
-      let contentType = station.media_content_type;
-      let contentId = station.media_content_id;
-
-      // For YouTube, use specific content type if available
-      if (station.source === 'youtube') {
-        // Home Assistant supports YouTube URLs directly
-        contentType = station.media_content_type || 'music';
-      } else if (station.source === 'local_mp3') {
-        // For local MP3 files (blob URLs), we need special handling
-        // Try to use the blob URL directly
-        contentType = 'audio/mpeg';
-      }
-
       // Call play_media service
       await this._hass.callService('media_player', 'play_media', {
         entity_id: this._selectedMediaPlayer,
-        media_content_id: contentId,
-        media_content_type: contentType
+        media_content_id: station.media_content_id,
+        media_content_type: station.media_content_type
       });
+
+      // Stop direct playback if it was running
+      if (this._audioElement) {
+        this._audioElement.pause();
+        this._isUsingDirectPlayback = false;
+      }
 
       this._currentStationIndex = index;
       this._selectedStationIndex = index;
@@ -659,11 +685,98 @@ class RadioBrowserCard extends HTMLElement {
       }, waitTime);
     } catch (error) {
       console.error('Error playing station:', error);
-      alert(`Error playing ${station.source === 'local_mp3' ? 'local MP3' : station.source === 'youtube' ? 'YouTube' : 'station'}: ${error.message}\n\nNote: YouTube and local MP3 playback require compatible media players (e.g., browser_mod, media_player.vlc).`);
+      alert(`Error playing station: ${error.message}`);
       // Reset state on error
       this._isPlaying = false;
       this.stopVisualizer();
     }
+  }
+
+  // Play custom stations directly in browser
+  playDirectInBrowser(station, index) {
+    console.log('Playing directly in browser:', station.title, 'Type:', station.source);
+
+    // Initialize audio element if not exists
+    if (!this._audioElement) {
+      this._audioElement = this.shadowRoot.querySelector('.direct-audio');
+      if (!this._audioElement) {
+        console.error('Audio element not found in shadow DOM');
+        return;
+      }
+
+      // Setup audio event listeners
+      this._audioElement.addEventListener('play', () => {
+        this._isPlaying = true;
+        this.startVisualizer();
+      });
+
+      this._audioElement.addEventListener('pause', () => {
+        this._isPlaying = false;
+        this.stopVisualizer();
+      });
+
+      this._audioElement.addEventListener('ended', () => {
+        this._isPlaying = false;
+        this.stopVisualizer();
+        // Auto-play next if available
+        this.playNext();
+      });
+
+      this._audioElement.addEventListener('error', (e) => {
+        console.error('Audio playback error:', e);
+        alert(`Error playing ${station.source === 'local_mp3' ? 'local MP3' : 'YouTube'}: ${this._audioElement.error.message}`);
+        this._isPlaying = false;
+        this.stopVisualizer();
+      });
+    }
+
+    // Stop any Home Assistant playback
+    if (this._hass && this._selectedMediaPlayer) {
+      this._hass.callService('media_player', 'media_stop', {
+        entity_id: this._selectedMediaPlayer
+      }).catch(err => console.log('Stop error:', err));
+    }
+
+    // Set source based on type
+    if (station.source === 'local_mp3' || station.source === 'custom_stream') {
+      // Local MP3 or custom stream - use URL directly
+      this._audioElement.src = station.media_content_id;
+    } else {
+      console.error('Unsupported source type for direct playback:', station.source);
+      return;
+    }
+
+    // Set volume from slider
+    const volumeSlider = this.shadowRoot.querySelector('.volume-slider');
+    if (volumeSlider) {
+      this._audioElement.volume = parseInt(volumeSlider.value) / 100;
+    }
+
+    // Play the audio
+    this._audioElement.play().then(() => {
+      this._isUsingDirectPlayback = true;
+      this._currentStationIndex = index;
+      this._selectedStationIndex = index;
+      this._isPlaying = true;
+
+      // Store station metadata for display
+      this._currentStationMetadata = {
+        title: station.title,
+        media_content_id: station.media_content_id,
+        source: station.source || 'local',
+        bitrate: this.extractBitrate(station),
+        codec: this.extractCodec(station),
+        country: this.extractCountry(station)
+      };
+
+      this.updatePlaylistSelection();
+      this.updateStationInfo();
+      this._saveState();
+    }).catch(err => {
+      console.error('Play error:', err);
+      alert(`Error playing: ${err.message}`);
+      this._isPlaying = false;
+    });
   }
 
   // Extract metadata from station object
@@ -709,6 +822,8 @@ class RadioBrowserCard extends HTMLElement {
       parts.push('▶️ YouTube');
     } else if (this._currentStationMetadata.source === 'local_mp3') {
       parts.push('🎵 Local MP3');
+    } else if (this._currentStationMetadata.source === 'custom_stream') {
+      parts.push('🌐 Custom Stream');
     }
 
     if (this._currentStationMetadata.country) {
@@ -743,6 +858,16 @@ class RadioBrowserCard extends HTMLElement {
   }
 
   async togglePlay() {
+    // If using direct playback, toggle audio element
+    if (this._isUsingDirectPlayback && this._audioElement) {
+      if (this._audioElement.paused) {
+        this._audioElement.play();
+      } else {
+        this._audioElement.pause();
+      }
+      return;
+    }
+
     if (!this._hass || !this._selectedMediaPlayer) return;
 
     const entity = this._hass.states[this._selectedMediaPlayer];
@@ -779,6 +904,21 @@ class RadioBrowserCard extends HTMLElement {
   }
 
   async stop() {
+    // Stop direct playback if active
+    if (this._isUsingDirectPlayback && this._audioElement) {
+      this._audioElement.pause();
+      this._audioElement.currentTime = 0;
+      this._isUsingDirectPlayback = false;
+      this._isPlaying = false;
+      this._currentStationIndex = -1;
+      this._currentStationMetadata = null;
+      this.stopVisualizer();
+      this.updatePlaylistSelection();
+      this.updateStationInfo();
+      this._saveState();
+      return;
+    }
+
     if (!this._hass || !this._selectedMediaPlayer) return;
 
     try {
@@ -798,8 +938,6 @@ class RadioBrowserCard extends HTMLElement {
   }
 
   async handleVolumeChange(e) {
-    if (!this._hass || !this._selectedMediaPlayer) return;
-
     const volumePercent = parseFloat(e.target.value);
     const volume = volumePercent / 100; // Convert to 0.0 - 1.0
 
@@ -809,13 +947,21 @@ class RadioBrowserCard extends HTMLElement {
       volumeSlider.style.setProperty('--volume-percent', volumePercent + '%');
     }
 
-    try {
-      await this._hass.callService('media_player', 'volume_set', {
-        entity_id: this._selectedMediaPlayer,
-        volume_level: volume
-      });
-    } catch (error) {
-      console.error('Error setting volume:', error);
+    // Update direct playback volume if active
+    if (this._audioElement) {
+      this._audioElement.volume = volume;
+    }
+
+    // Also update Home Assistant player volume if connected
+    if (this._hass && this._selectedMediaPlayer) {
+      try {
+        await this._hass.callService('media_player', 'volume_set', {
+          entity_id: this._selectedMediaPlayer,
+          volume_level: volume
+        });
+      } catch (error) {
+        console.error('Error setting volume:', error);
+      }
     }
   }
 
@@ -845,8 +991,8 @@ class RadioBrowserCard extends HTMLElement {
       if (actualIndex === this._currentStationIndex) classes.push('current');
       if (actualIndex === this._selectedStationIndex) classes.push('selected');
       const isFav = this.isFavorite(station);
-      const isCustom = station.source === 'youtube' || station.source === 'local_mp3';
-      const sourceBadge = station.source === 'youtube' ? '▶️' : (station.source === 'local_mp3' ? '🎵' : '');
+      const isCustom = station.source === 'youtube' || station.source === 'local_mp3' || station.source === 'custom_stream';
+      const sourceBadge = station.source === 'youtube' ? '▶️' : (station.source === 'local_mp3' ? '🎵' : (station.source === 'custom_stream' ? '🌐' : ''));
 
       return `
         <div class="playlist-item ${classes.join(' ')}"
@@ -1865,6 +2011,9 @@ class RadioBrowserCard extends HTMLElement {
             </div>
           </div>
         </div>
+
+        <!-- Hidden audio element for direct browser playback (local MP3) -->
+        <audio class="direct-audio" style="display: none;"></audio>
       </div>
     `;
 
