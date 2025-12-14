@@ -1,5 +1,7 @@
 # 📻 Radio Browser Card
 
+**[🇨🇿 Česká verze](README.cs.md)** | **🇬🇧 English**
+
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
 [![GitHub release](https://img.shields.io/github/release/joshuaaaaa/HA---Radio-card.svg)](https://github.com/joshuaaaaa/HA---Radio-card/releases)
 [![License](https://img.shields.io/github/license/joshuaaaaa/HA---Radio-card.svg)](LICENSE)
