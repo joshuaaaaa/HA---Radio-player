@@ -29,6 +29,8 @@ class RadioBrowserCard extends HTMLElement {
     this._keepaliveInterval = null;
     this._pageHidden = false;
     this._wakeLock = null;
+    this._lastMediaPosition = null;
+    this._mediaStallCount = 0;
 
     // Restore state after page reload
     this._restoreState();
@@ -2236,8 +2238,8 @@ class RadioBrowserCard extends HTMLElement {
       clearInterval(this._keepaliveInterval);
     }
 
-    // Ping every 60 seconds to keep connection alive
-    // Use longer interval to reduce overhead but still prevent timeout
+    // Ping every 30 seconds to keep connection alive and detect stalls
+    // More frequent checks help catch playback issues faster
     this._keepaliveInterval = setInterval(async () => {
       if (this._hass && this._isPlaying && !this._isUsingDirectPlayback) {
         // For browser_mod players, send periodic volume check to keep connection alive
@@ -2260,14 +2262,45 @@ class RadioBrowserCard extends HTMLElement {
             }
           }
 
-          // Check if playback stopped
+          // Check if playback state indicates playing
           if (entity.state !== 'playing') {
-            console.warn('Playback stopped unexpectedly, attempting recovery...');
+            console.warn('Player state is not "playing", attempting recovery...');
             this._recoverPlayback();
+            return;
+          }
+
+          // For streams, check if media position is updating (detects silent/stalled playback)
+          const mediaPosition = entity.attributes.media_position;
+          const mediaDuration = entity.attributes.media_duration;
+
+          // For live streams, duration is usually null or 0
+          // Check if we have position tracking
+          if (mediaPosition !== undefined && mediaPosition !== null) {
+            if (this._lastMediaPosition !== null && mediaPosition === this._lastMediaPosition) {
+              this._mediaStallCount++;
+              console.warn(`Media position hasn't changed (${mediaPosition}s) - stall count: ${this._mediaStallCount}`);
+
+              // If position hasn't changed for 2 checks (60 seconds), consider it stalled
+              if (this._mediaStallCount >= 2) {
+                console.error('Media playback appears stalled (no position change), forcing recovery...');
+                this._mediaStallCount = 0;
+                this._lastMediaPosition = null;
+                this._recoverPlayback();
+                return;
+              }
+            } else {
+              // Position changed, reset stall counter
+              this._mediaStallCount = 0;
+            }
+            this._lastMediaPosition = mediaPosition;
+          } else {
+            // No position tracking (live stream), rely on state only
+            this._lastMediaPosition = null;
+            this._mediaStallCount = 0;
           }
         }
       }
-    }, 60000); // 60 seconds
+    }, 30000); // 30 seconds - more frequent for better stall detection
   }
 
   // Request wake lock to keep device awake during playback
@@ -2327,11 +2360,15 @@ class RadioBrowserCard extends HTMLElement {
     try {
       const station = this._getCurrentStation();
       if (station) {
-        console.log('Recovering playback for:', station.title);
+        console.log('🔄 Recovering playback for:', station.title);
+
+        // Stop visualizer before recovery
+        this.stopVisualizer();
 
         if (this._isUsingDirectPlayback && this._audioElement) {
           // Resume direct playback
           await this._audioElement.play();
+          console.log('✅ Direct playback recovered');
         } else if (this._hass && this._selectedMediaPlayer) {
           // Restart HA media player
           await this._hass.callService('media_player', 'play_media', {
@@ -2339,10 +2376,23 @@ class RadioBrowserCard extends HTMLElement {
             media_content_id: station.media_content_id,
             media_content_type: station.media_content_type
           });
+
+          // Wait for playback to start, then restart visualizer
+          setTimeout(() => {
+            const entity = this._hass.states[this._selectedMediaPlayer];
+            if (entity && entity.state === 'playing') {
+              this.startVisualizer();
+              console.log('✅ Playback recovered and visualizer restarted');
+            }
+          }, 2000);
         }
+
+        // Update UI
+        this.updatePlaylistSelection();
+        this.updateStationInfo();
       }
     } catch (err) {
-      console.error('Error recovering playback:', err);
+      console.error('❌ Error recovering playback:', err);
     }
   }
 
