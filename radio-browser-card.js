@@ -541,7 +541,9 @@ class RadioBrowserCard extends HTMLElement {
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    if (!this._selectedMediaPlayer || !this._hass.states[this._selectedMediaPlayer]) {
+    // Only auto-select first player if user hasn't selected one yet
+    // Don't reset selection if player temporarily disappears from states
+    if (!this._selectedMediaPlayer) {
       if (this._mediaPlayers.length > 0) {
         this._selectedMediaPlayer = this._mediaPlayers[0].entity_id;
       }
@@ -559,6 +561,10 @@ class RadioBrowserCard extends HTMLElement {
 
     selectEl.innerHTML = '<option value="">Select Player...</option>';
 
+    // Check if selected player is in the list
+    const selectedPlayerInList = this._mediaPlayers.some(p => p.entity_id === this._selectedMediaPlayer);
+
+    // Add all available players
     this._mediaPlayers.forEach(player => {
       const option = document.createElement('option');
       option.value = player.entity_id;
@@ -566,6 +572,15 @@ class RadioBrowserCard extends HTMLElement {
       option.selected = player.entity_id === this._selectedMediaPlayer;
       selectEl.appendChild(option);
     });
+
+    // If selected player is not in list (temporarily unavailable), show it anyway
+    if (this._selectedMediaPlayer && !selectedPlayerInList) {
+      const option = document.createElement('option');
+      option.value = this._selectedMediaPlayer;
+      option.textContent = `${this._selectedMediaPlayer} (temporarily unavailable)`;
+      option.selected = true;
+      selectEl.appendChild(option);
+    }
   }
 
   async loadCountries() {
