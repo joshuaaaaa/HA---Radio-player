@@ -16,6 +16,7 @@ class RadioBrowserCard extends HTMLElement {
     this._searchQuery = '';
     this._visualizerStyle = localStorage.getItem('radio_visualizer_style') || 'bars';
     this._theme = localStorage.getItem('radio_theme') || 'dark';
+    this._electricBorder = localStorage.getItem('radio_electric_border') === 'true' || false;
     this._keyboardHandler = null;
     this._isMuted = false;
     this._volumeBeforeMute = 50;
@@ -534,6 +535,18 @@ class RadioBrowserCard extends HTMLElement {
     this._visualizerStyle = style;
     localStorage.setItem('radio_visualizer_style', style);
     this.stopVisualizer();
+    if (this._isPlaying) {
+      this.startVisualizer();
+    }
+  }
+
+  // Electric border management
+  toggleElectricBorder() {
+    this._electricBorder = !this._electricBorder;
+    localStorage.setItem('radio_electric_border', this._electricBorder);
+    this.render();
+
+    // Restart visualizer if it was playing
     if (this._isPlaying) {
       this.startVisualizer();
     }
@@ -2048,11 +2061,85 @@ class RadioBrowserCard extends HTMLElement {
         .favorite-icon.active {
           color: ${colors.primary};
         }
+
+        /* Electric Border Effect */
+        .electric-border-active {
+          position: relative;
+          overflow: visible !important;
+        }
+
+        .electric-border-active::before {
+          content: '';
+          position: absolute;
+          top: -3px;
+          left: -3px;
+          right: -3px;
+          bottom: -3px;
+          background: conic-gradient(
+            from 0deg,
+            transparent 0%,
+            #00f3ff 10%,
+            #00d4ff 20%,
+            transparent 30%,
+            transparent 70%,
+            #ff00ea 80%,
+            #d400ff 90%,
+            transparent 100%
+          );
+          border-radius: 10px;
+          z-index: -1;
+          animation: electric-rotate 4s linear infinite;
+          filter: blur(8px);
+          opacity: 0.8;
+        }
+
+        .electric-border-active::after {
+          content: '';
+          position: absolute;
+          top: -2px;
+          left: -2px;
+          right: -2px;
+          bottom: -2px;
+          background: conic-gradient(
+            from 180deg,
+            transparent 0%,
+            #ff00ea 10%,
+            #d400ff 20%,
+            transparent 30%,
+            transparent 70%,
+            #00f3ff 80%,
+            #00d4ff 90%,
+            transparent 100%
+          );
+          border-radius: 10px;
+          z-index: -1;
+          animation: electric-rotate-reverse 3s linear infinite;
+          filter: blur(6px);
+          opacity: 0.6;
+        }
+
+        @keyframes electric-rotate {
+          0% {
+            transform: rotate(0deg);
+          }
+          100% {
+            transform: rotate(360deg);
+          }
+        }
+
+        @keyframes electric-rotate-reverse {
+          0% {
+            transform: rotate(360deg);
+          }
+          100% {
+            transform: rotate(0deg);
+          }
+        }
       </style>
 
       <div class="winamp-container">
         <!-- Main Player Window -->
-        <div class="main-window">
+        <div class="main-window ${this._electricBorder ? 'electric-border-active' : ''}">
           <div class="track-title">Radio Browser</div>
           <div class="station-info" style="display: none;"></div>
           <div class="sleep-timer-display" style="display: none;"></div>
@@ -2139,6 +2226,13 @@ class RadioBrowserCard extends HTMLElement {
                         onclick="this.getRootNode().host.setVisualizerStyle('waveform')">Wave</button>
                 <button class="settings-option ${this._visualizerStyle === 'circle' ? 'active' : ''}"
                         onclick="this.getRootNode().host.setVisualizerStyle('circle')">Circle</button>
+              </div>
+            </div>
+            <div class="settings-group">
+              <div class="settings-label">Electric Border</div>
+              <div class="settings-options">
+                <button class="settings-option ${this._electricBorder ? 'active' : ''}"
+                        onclick="this.getRootNode().host.toggleElectricBorder()">⚡ ${this._electricBorder ? 'ON' : 'OFF'}</button>
               </div>
             </div>
             <div class="settings-group">
