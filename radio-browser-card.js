@@ -700,20 +700,11 @@ class RadioBrowserCard extends HTMLElement {
       return;
     }
 
-    // Check if browser_mod player is selected
-    const entity = this._hass?.states[this._selectedMediaPlayer];
-    const isBrowserPlayer = entity && entity.entity_id && entity.entity_id.includes('browser');
-
-    // For browser_mod players, use direct HTML5 playback for radio stations
-    // This prevents timeout issues with browser_mod API
-    if (isBrowserPlayer && station.source !== 'youtube') {
-      console.log('Using direct playback for browser_mod player to avoid timeout issues');
-      this.playDirectInBrowser(station, index);
-      return;
-    }
-
-    // For YouTube and non-browser players, use Home Assistant media player
+    // For YouTube and radio stations, use Home Assistant media player
     if (!this._hass || !this._selectedMediaPlayer) return;
+
+    const entity = this._hass.states[this._selectedMediaPlayer];
+    const isBrowserPlayer = entity && entity.entity_id && entity.entity_id.includes('browser');
 
     try {
       // Set safe default volume (10%) before playing if volume is too high or not set
@@ -2245,20 +2236,38 @@ class RadioBrowserCard extends HTMLElement {
       clearInterval(this._keepaliveInterval);
     }
 
-    // Ping every 30 seconds to keep connection alive
-    this._keepaliveInterval = setInterval(() => {
-      if (this._hass && this._isPlaying) {
-        // Check if player is still playing
+    // Ping every 60 seconds to keep connection alive
+    // Use longer interval to reduce overhead but still prevent timeout
+    this._keepaliveInterval = setInterval(async () => {
+      if (this._hass && this._isPlaying && !this._isUsingDirectPlayback) {
+        // For browser_mod players, send periodic volume check to keep connection alive
         if (this._selectedMediaPlayer && this._hass.states[this._selectedMediaPlayer]) {
           const entity = this._hass.states[this._selectedMediaPlayer];
-          if (entity.state !== 'playing' && !this._isUsingDirectPlayback) {
+          const isBrowserPlayer = entity.entity_id && entity.entity_id.includes('browser');
+
+          if (isBrowserPlayer) {
+            // Send a harmless volume_set command to keep browser_mod connection active
+            // This prevents the 5-minute timeout
+            try {
+              const currentVolume = entity.attributes.volume_level || 0.1;
+              await this._hass.callService('media_player', 'volume_set', {
+                entity_id: this._selectedMediaPlayer,
+                volume_level: currentVolume
+              });
+              console.log('Browser_mod keepalive ping sent');
+            } catch (err) {
+              console.warn('Keepalive ping failed:', err);
+            }
+          }
+
+          // Check if playback stopped
+          if (entity.state !== 'playing') {
             console.warn('Playback stopped unexpectedly, attempting recovery...');
-            // Try to resume playback
             this._recoverPlayback();
           }
         }
       }
-    }, 30000); // 30 seconds
+    }, 60000); // 60 seconds
   }
 
   // Request wake lock to keep device awake during playback
