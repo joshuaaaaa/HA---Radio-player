@@ -26,9 +26,18 @@ class RadioBrowserCard extends HTMLElement {
     this._customStations = this.loadCustomStations();
     this._audioElement = null;
     this._isUsingDirectPlayback = false;
+    this._keepaliveInterval = null;
+    this._pageHidden = false;
+    this._wakeLock = null;
 
     // Restore state after page reload
     this._restoreState();
+
+    // Setup visibility change handler to keep playback alive
+    this._setupVisibilityHandler();
+
+    // Setup keepalive to prevent connection timeout
+    this._startKeepalive();
   }
 
   setConfig(config) {
@@ -740,6 +749,9 @@ class RadioBrowserCard extends HTMLElement {
       this._selectedStationIndex = index;
       this._isPlaying = true;
 
+      // Request wake lock to keep playback active when page is hidden
+      this._requestWakeLock();
+
       // Store station metadata for display
       this._currentStationMetadata = {
         title: station.title,
@@ -843,6 +855,9 @@ class RadioBrowserCard extends HTMLElement {
       this._currentStationIndex = index;
       this._selectedStationIndex = index;
       this._isPlaying = true;
+
+      // Request wake lock to keep playback active when page is hidden
+      this._requestWakeLock();
 
       // Store station metadata for display
       this._currentStationMetadata = {
@@ -1001,6 +1016,8 @@ class RadioBrowserCard extends HTMLElement {
       this.updatePlaylistSelection();
       this.updateStationInfo();
       this._saveState();
+      // Release wake lock when stopping
+      this._releaseWakeLock();
       return;
     }
 
@@ -1017,6 +1034,8 @@ class RadioBrowserCard extends HTMLElement {
       this.updatePlaylistSelection();
       this.updateStationInfo();
       this._saveState();
+      // Release wake lock when stopping
+      this._releaseWakeLock();
     } catch (error) {
       console.error('Error stopping:', error);
     }
@@ -1384,6 +1403,13 @@ class RadioBrowserCard extends HTMLElement {
       clearInterval(this._sleepTimerInterval);
       this._sleepTimerInterval = null;
     }
+    // Clean up keepalive interval
+    if (this._keepaliveInterval) {
+      clearInterval(this._keepaliveInterval);
+      this._keepaliveInterval = null;
+    }
+    // Release wake lock
+    this._releaseWakeLock();
   }
 
   escapeHtml(text) {
@@ -2180,6 +2206,132 @@ class RadioBrowserCard extends HTMLElement {
         menu.classList.remove('active');
       }
     }
+  }
+
+  // Keep playback alive when page is hidden/minimized
+  _setupVisibilityHandler() {
+    document.addEventListener('visibilitychange', () => {
+      this._pageHidden = document.hidden;
+
+      if (document.hidden) {
+        console.log('Page hidden - maintaining playback');
+        // Request wake lock if playing to prevent sleep
+        this._requestWakeLock();
+      } else {
+        console.log('Page visible - checking playback state');
+        // Release wake lock when page is visible
+        this._releaseWakeLock();
+        // Verify playback is still active
+        if (this._isPlaying) {
+          this._verifyPlayback();
+        }
+      }
+    });
+  }
+
+  // Keepalive ping to prevent WebSocket timeout
+  _startKeepalive() {
+    // Clear any existing interval
+    if (this._keepaliveInterval) {
+      clearInterval(this._keepaliveInterval);
+    }
+
+    // Ping every 30 seconds to keep connection alive
+    this._keepaliveInterval = setInterval(() => {
+      if (this._hass && this._isPlaying) {
+        // Check if player is still playing
+        if (this._selectedMediaPlayer && this._hass.states[this._selectedMediaPlayer]) {
+          const entity = this._hass.states[this._selectedMediaPlayer];
+          if (entity.state !== 'playing' && !this._isUsingDirectPlayback) {
+            console.warn('Playback stopped unexpectedly, attempting recovery...');
+            // Try to resume playback
+            this._recoverPlayback();
+          }
+        }
+      }
+    }, 30000); // 30 seconds
+  }
+
+  // Request wake lock to keep device awake during playback
+  async _requestWakeLock() {
+    if ('wakeLock' in navigator && this._isPlaying) {
+      try {
+        this._wakeLock = await navigator.wakeLock.request('screen');
+        console.log('Wake Lock activated');
+
+        this._wakeLock.addEventListener('release', () => {
+          console.log('Wake Lock released');
+        });
+      } catch (err) {
+        console.log('Wake Lock not available:', err);
+      }
+    }
+  }
+
+  // Release wake lock
+  async _releaseWakeLock() {
+    if (this._wakeLock) {
+      try {
+        await this._wakeLock.release();
+        this._wakeLock = null;
+      } catch (err) {
+        console.log('Error releasing wake lock:', err);
+      }
+    }
+  }
+
+  // Verify playback is still active
+  _verifyPlayback() {
+    if (!this._isPlaying) return;
+
+    if (this._isUsingDirectPlayback && this._audioElement) {
+      // Check HTML5 audio element
+      if (this._audioElement.paused) {
+        console.log('Direct playback paused, resuming...');
+        this._audioElement.play().catch(err => {
+          console.error('Error resuming direct playback:', err);
+        });
+      }
+    } else if (this._hass && this._selectedMediaPlayer) {
+      // Check Home Assistant player
+      const entity = this._hass.states[this._selectedMediaPlayer];
+      if (entity && entity.state !== 'playing') {
+        console.log('HA player not playing, attempting recovery...');
+        this._recoverPlayback();
+      }
+    }
+  }
+
+  // Attempt to recover playback after interruption
+  async _recoverPlayback() {
+    if (!this._isPlaying || this._currentStationIndex === -1) return;
+
+    try {
+      const station = this._getCurrentStation();
+      if (station) {
+        console.log('Recovering playback for:', station.title);
+
+        if (this._isUsingDirectPlayback && this._audioElement) {
+          // Resume direct playback
+          await this._audioElement.play();
+        } else if (this._hass && this._selectedMediaPlayer) {
+          // Restart HA media player
+          await this._hass.callService('media_player', 'play_media', {
+            entity_id: this._selectedMediaPlayer,
+            media_content_id: station.media_content_id,
+            media_content_type: station.media_content_type
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error recovering playback:', err);
+    }
+  }
+
+  // Get current playing station
+  _getCurrentStation() {
+    const allStations = [...this._favorites, ...this._customStations, ...this._stations];
+    return allStations[this._currentStationIndex];
   }
 
   setupEventListeners() {}
