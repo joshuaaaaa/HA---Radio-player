@@ -1032,19 +1032,15 @@ class RadioBrowserCard extends HTMLElement {
   }
 
   async stop() {
-    // Set _isPlaying to false IMMEDIATELY to prevent keepalive from triggering recovery
-    this._isPlaying = false;
-    this._currentStationIndex = -1;
-    this._currentStationMetadata = null;
-
-    // Stop visualizer immediately
-    this.stopVisualizer();
-
     // Stop direct playback if active
     if (this._isUsingDirectPlayback && this._audioElement) {
       this._audioElement.pause();
       this._audioElement.currentTime = 0;
       this._isUsingDirectPlayback = false;
+      this._isPlaying = false;
+      this._currentStationIndex = -1;
+      this._currentStationMetadata = null;
+      this.stopVisualizer();
       this.updatePlaylistSelection();
       this.updateStationInfo();
       this._saveState();
@@ -1059,6 +1055,10 @@ class RadioBrowserCard extends HTMLElement {
       await this._hass.callService('media_player', 'media_stop', {
         entity_id: this._selectedMediaPlayer
       });
+      this._isPlaying = false;
+      this._currentStationIndex = -1;
+      this._currentStationMetadata = null;
+      this.stopVisualizer(); // Immediately stop visualizer
       this.updatePlaylistSelection();
       this.updateStationInfo();
       this._saveState();
@@ -2062,218 +2062,106 @@ class RadioBrowserCard extends HTMLElement {
           color: ${colors.primary};
         }
 
-        /* Electric Border Effect - Advanced version with turbulence */
+        /* Electric Border Effect */
         .electric-border-active {
           position: relative;
-          padding: 2px;
-          border-radius: 8px;
           overflow: visible !important;
-          background: linear-gradient(
-              -30deg,
-              rgba(221, 132, 72, 0.4),
-              transparent,
-              rgba(221, 132, 72, 0.4)
-            ),
-            linear-gradient(
-              to bottom,
-              ${colors.background},
-              ${colors.background}
-            );
         }
 
-        .electric-border-active .main-window-inner {
-          position: relative;
-          width: 100%;
-          height: 100%;
-        }
-
-        .electric-border-active .border-outer {
-          border: 2px solid rgba(221, 132, 72, 0.5);
-          border-radius: 8px;
-          padding-right: 4px;
-          padding-bottom: 4px;
-          position: relative;
-          width: 100%;
-          height: 100%;
-        }
-
-        .electric-border-active .main-card-layer {
-          border-radius: 8px;
-          border: 2px solid #dd8448;
-          margin-top: -4px;
-          margin-left: -4px;
-          filter: url(#turbulent-displace);
-          position: relative;
-          width: calc(100% + 4px);
-          height: calc(100% + 4px);
-          background: ${colors.background};
-        }
-
-        .electric-border-active .glow-layer-1 {
-          border: 2px solid rgba(221, 132, 72, 0.6);
-          border-radius: 8px;
-          width: 100%;
-          height: 100%;
+        .electric-border-active::before {
+          content: '';
           position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          filter: blur(1px);
-          pointer-events: none;
-        }
-
-        .electric-border-active .glow-layer-2 {
-          border: 2px solid #dd8448;
-          border-radius: 8px;
-          width: 100%;
-          height: 100%;
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          filter: blur(4px);
-          pointer-events: none;
-        }
-
-        .electric-border-active .overlay-1 {
-          position: absolute;
-          width: 100%;
-          height: 100%;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          border-radius: 8px;
-          opacity: 1;
-          mix-blend-mode: overlay;
-          transform: scale(1.1);
-          filter: blur(16px);
-          background: linear-gradient(
-            -30deg,
-            white,
+          top: -3px;
+          left: -3px;
+          right: -3px;
+          bottom: -3px;
+          background: conic-gradient(
+            from 0deg,
+            transparent 0%,
+            #00f3ff 10%,
+            #00d4ff 20%,
             transparent 30%,
             transparent 70%,
-            white
+            #ff00ea 80%,
+            #d400ff 90%,
+            transparent 100%
           );
-          pointer-events: none;
-        }
-
-        .electric-border-active .overlay-2 {
-          position: absolute;
-          width: 100%;
-          height: 100%;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          border-radius: 8px;
-          opacity: 0.5;
-          mix-blend-mode: overlay;
-          transform: scale(1.1);
-          filter: blur(16px);
-          background: linear-gradient(
-            -30deg,
-            white,
-            transparent 30%,
-            transparent 70%,
-            white
-          );
-          pointer-events: none;
-        }
-
-        .electric-border-active .background-glow {
-          position: absolute;
-          width: 100%;
-          height: 100%;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          border-radius: 8px;
-          filter: blur(32px);
-          transform: scale(1.1);
-          opacity: 0.3;
+          border-radius: 10px;
           z-index: -1;
-          background: linear-gradient(
-            -30deg,
-            #dd8448,
-            transparent,
-            #dd8448
+          animation: electric-rotate 4s linear infinite;
+          filter: blur(8px);
+          opacity: 0.8;
+        }
+
+        .electric-border-active::after {
+          content: '';
+          position: absolute;
+          top: -2px;
+          left: -2px;
+          right: -2px;
+          bottom: -2px;
+          background: conic-gradient(
+            from 180deg,
+            transparent 0%,
+            #ff00ea 10%,
+            #d400ff 20%,
+            transparent 30%,
+            transparent 70%,
+            #00f3ff 80%,
+            #00d4ff 90%,
+            transparent 100%
           );
-          pointer-events: none;
+          border-radius: 10px;
+          z-index: -1;
+          animation: electric-rotate-reverse 3s linear infinite;
+          filter: blur(6px);
+          opacity: 0.6;
+        }
+
+        @keyframes electric-rotate {
+          0% {
+            transform: rotate(0deg);
+          }
+          100% {
+            transform: rotate(360deg);
+          }
+        }
+
+        @keyframes electric-rotate-reverse {
+          0% {
+            transform: rotate(360deg);
+          }
+          100% {
+            transform: rotate(0deg);
+          }
         }
       </style>
-
-      <!-- SVG filter for electric turbulence effect -->
-      <svg style="position: absolute; width: 0; height: 0;">
-        <defs>
-          <filter id="turbulent-displace">
-            <feTurbulence
-              type="turbulence"
-              baseFrequency="0.009 0.009"
-              numOctaves="2"
-              result="turbulence"
-              seed="1">
-              <animate
-                attributeName="baseFrequency"
-                dur="40s"
-                values="0.009 0.009;0.012 0.009;0.009 0.009"
-                repeatCount="indefinite" />
-            </feTurbulence>
-            <feDisplacementMap
-              in="SourceGraphic"
-              in2="turbulence"
-              scale="8"
-              xChannelSelector="R"
-              yChannelSelector="G" />
-          </filter>
-        </defs>
-      </svg>
 
       <div class="winamp-container">
         <!-- Main Player Window -->
         <div class="main-window ${this._electricBorder ? 'electric-border-active' : ''}">
-          ${this._electricBorder ? `
-          <div class="main-window-inner">
-            <div class="border-outer">
-              <div class="main-card-layer">
-                <div class="glow-layer-1"></div>
-                <div class="glow-layer-2"></div>
-                <div class="overlay-1"></div>
-                <div class="overlay-2"></div>
-                <div class="background-glow"></div>
-          ` : ''}
+          <div class="track-title">Radio Browser</div>
+          <div class="station-info" style="display: none;"></div>
+          <div class="sleep-timer-display" style="display: none;"></div>
 
-                <div class="track-title">Radio Browser</div>
-                <div class="station-info" style="display: none;"></div>
-                <div class="sleep-timer-display" style="display: none;"></div>
+          <!-- Visualizer -->
+          <canvas class="visualizer" width="80" height="32"></canvas>
 
-                <!-- Visualizer -->
-                <canvas class="visualizer" width="80" height="32"></canvas>
-
-                <!-- Control Buttons -->
-                <div class="control-buttons">
-                  <button class="control-btn btn-prev" onclick="this.getRootNode().host.playPrevious()" title="Previous (←)"></button>
-                  <button class="control-btn btn-play" onclick="this.getRootNode().host.togglePlay()" title="Play (Space)"></button>
-                  <button class="control-btn btn-pause" onclick="this.getRootNode().host.togglePlay()" title="Pause (Space)"></button>
-                  <button class="control-btn btn-stop" onclick="this.getRootNode().host.stop()" title="Stop"></button>
-                  <button class="control-btn btn-next" onclick="this.getRootNode().host.playNext()" title="Next (→)"></button>
-                </div>
-
-                <!-- Volume Control -->
-                <div class="volume-control">
-                  <input type="range" class="volume-slider" min="0" max="100" value="${currentVolume}"
-                         oninput="this.getRootNode().host.handleVolumeChange(event)"
-                         title="Volume (↑↓)">
-                </div>
-
-          ${this._electricBorder ? `
-              </div>
-            </div>
+          <!-- Control Buttons -->
+          <div class="control-buttons">
+            <button class="control-btn btn-prev" onclick="this.getRootNode().host.playPrevious()" title="Previous (←)"></button>
+            <button class="control-btn btn-play" onclick="this.getRootNode().host.togglePlay()" title="Play (Space)"></button>
+            <button class="control-btn btn-pause" onclick="this.getRootNode().host.togglePlay()" title="Pause (Space)"></button>
+            <button class="control-btn btn-stop" onclick="this.getRootNode().host.stop()" title="Stop"></button>
+            <button class="control-btn btn-next" onclick="this.getRootNode().host.playNext()" title="Next (→)"></button>
           </div>
-          ` : ''}
+
+          <!-- Volume Control -->
+          <div class="volume-control">
+            <input type="range" class="volume-slider" min="0" max="100" value="${currentVolume}"
+                   oninput="this.getRootNode().host.handleVolumeChange(event)"
+                   title="Volume (↑↓)">
+          </div>
         </div>
 
         <!-- Playlist Window -->
@@ -2488,10 +2376,8 @@ class RadioBrowserCard extends HTMLElement {
           }
 
           // Check if playback state indicates playing
-          // BUT only attempt recovery if we THINK we're still playing
-          // If user pressed STOP, _isPlaying will be false and we shouldn't recover
-          if (entity.state !== 'playing' && this._isPlaying) {
-            console.warn('Player state is not "playing" but _isPlaying=true, attempting recovery...');
+          if (entity.state !== 'playing') {
+            console.warn('Player state is not "playing", attempting recovery...');
             this._recoverPlayback();
             return;
           }
