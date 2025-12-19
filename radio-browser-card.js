@@ -1032,15 +1032,19 @@ class RadioBrowserCard extends HTMLElement {
   }
 
   async stop() {
+    // Set _isPlaying to false IMMEDIATELY to prevent keepalive from triggering recovery
+    this._isPlaying = false;
+    this._currentStationIndex = -1;
+    this._currentStationMetadata = null;
+
+    // Stop visualizer immediately
+    this.stopVisualizer();
+
     // Stop direct playback if active
     if (this._isUsingDirectPlayback && this._audioElement) {
       this._audioElement.pause();
       this._audioElement.currentTime = 0;
       this._isUsingDirectPlayback = false;
-      this._isPlaying = false;
-      this._currentStationIndex = -1;
-      this._currentStationMetadata = null;
-      this.stopVisualizer();
       this.updatePlaylistSelection();
       this.updateStationInfo();
       this._saveState();
@@ -1055,10 +1059,6 @@ class RadioBrowserCard extends HTMLElement {
       await this._hass.callService('media_player', 'media_stop', {
         entity_id: this._selectedMediaPlayer
       });
-      this._isPlaying = false;
-      this._currentStationIndex = -1;
-      this._currentStationMetadata = null;
-      this.stopVisualizer(); // Immediately stop visualizer
       this.updatePlaylistSelection();
       this.updateStationInfo();
       this._saveState();
@@ -2488,8 +2488,10 @@ class RadioBrowserCard extends HTMLElement {
           }
 
           // Check if playback state indicates playing
-          if (entity.state !== 'playing') {
-            console.warn('Player state is not "playing", attempting recovery...');
+          // BUT only attempt recovery if we THINK we're still playing
+          // If user pressed STOP, _isPlaying will be false and we shouldn't recover
+          if (entity.state !== 'playing' && this._isPlaying) {
+            console.warn('Player state is not "playing" but _isPlaying=true, attempting recovery...');
             this._recoverPlayback();
             return;
           }
