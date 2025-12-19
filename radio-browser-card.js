@@ -55,6 +55,19 @@ class RadioBrowserCard extends HTMLElement {
     const oldHass = this._hass;
     this._hass = hass;
 
+    // Detect WebSocket reconnection (connection was lost and restored)
+    if (oldHass && oldHass.connection !== hass.connection) {
+      console.log('⚠️ Home Assistant connection changed - WebSocket reconnected');
+
+      // If we were playing, the subscription was lost, need to recover
+      if (this._isPlaying && !this._isUsingDirectPlayback) {
+        console.log('🔄 Recovering playback after WebSocket reconnection...');
+        setTimeout(() => {
+          this._recoverPlayback();
+        }, 1000);
+      }
+    }
+
     if (!oldHass || Object.keys(oldHass.states).length !== Object.keys(hass.states).length) {
       this.updateMediaPlayers();
     }
@@ -2258,7 +2271,13 @@ class RadioBrowserCard extends HTMLElement {
               });
               console.log('Browser_mod keepalive ping sent');
             } catch (err) {
-              console.warn('Keepalive ping failed:', err);
+              console.error('❌ Keepalive ping failed (subscription lost?):', err);
+
+              // If ping fails, the WebSocket subscription is likely lost
+              // Force immediate recovery
+              console.log('🔄 Forcing immediate recovery due to failed keepalive');
+              this._recoverPlayback();
+              return;
             }
           }
 
@@ -2280,7 +2299,7 @@ class RadioBrowserCard extends HTMLElement {
               this._mediaStallCount++;
               console.warn(`Media position hasn't changed (${mediaPosition}s) - stall count: ${this._mediaStallCount}`);
 
-              // If position hasn't changed for 2 checks (60 seconds), consider it stalled
+              // If position hasn't changed for 2 checks (40 seconds), consider it stalled
               if (this._mediaStallCount >= 2) {
                 console.error('Media playback appears stalled (no position change), forcing recovery...');
                 this._mediaStallCount = 0;
@@ -2300,7 +2319,7 @@ class RadioBrowserCard extends HTMLElement {
           }
         }
       }
-    }, 30000); // 30 seconds - more frequent for better stall detection
+    }, 20000); // 20 seconds - frequent checks to quickly detect subscription loss
   }
 
   // Request wake lock to keep device awake during playback
