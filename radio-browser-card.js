@@ -33,7 +33,8 @@ class RadioBrowserCard extends HTMLElement {
 
   setConfig(config) {
     this.config = { name: config.name || 'Radio Browser', entity: config.entity || null, ...config };
-    if (this.config.entity) {
+    // Only use config entity if no saved state exists (don't override user's selection)
+    if (this.config.entity && !this._selectedMediaPlayer) {
       this._selectedMediaPlayer = this.config.entity;
     }
     this.render();
@@ -350,8 +351,8 @@ class RadioBrowserCard extends HTMLElement {
       if (!stored) return;
 
       const state = JSON.parse(stored);
-      // Only restore if state is less than 5 minutes old
-      if (Date.now() - state.timestamp < 5 * 60 * 1000) {
+      // Only restore if state is less than 30 minutes old
+      if (Date.now() - state.timestamp < 30 * 60 * 1000) {
         this._selectedMediaPlayer = state.selectedMediaPlayer;
         this._selectedCountry = state.selectedCountry;
         this._currentStationIndex = state.currentStationIndex;
@@ -637,6 +638,9 @@ class RadioBrowserCard extends HTMLElement {
     this._selectedCountry = '';
     this._currentStationIndex = -1;
 
+    // Save selected media player to survive page reloads
+    this._saveState();
+
     if (this._selectedMediaPlayer) {
       this.loadCountries();
     } else {
@@ -647,6 +651,9 @@ class RadioBrowserCard extends HTMLElement {
   handleCountryChange(e) {
     this._selectedCountry = e.target.value;
     this._currentStationIndex = -1;
+
+    // Save selected country to survive page reloads
+    this._saveState();
 
     if (this._selectedCountry) {
       this.loadStationsByCountry(this._selectedCountry);
