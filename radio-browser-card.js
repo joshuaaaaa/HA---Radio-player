@@ -2373,50 +2373,50 @@ class RadioBrowserCard extends HTMLElement {
               this._recoverPlayback();
               return;
             }
-          }
 
-          // Check if playback state indicates playing
-          if (entity.state !== 'playing') {
-            console.warn('Player state is not "playing", attempting recovery...');
-            this._recoverPlayback();
-            return;
-          }
+            // Check if playback state indicates playing
+            if (entity.state !== 'playing') {
+              console.warn('Player state is not "playing", attempting recovery...');
+              this._recoverPlayback();
+              return;
+            }
 
-          // For streams, check if media position is updating (detects silent/stalled playback)
-          const mediaPosition = entity.attributes.media_position;
-          const mediaDuration = entity.attributes.media_duration;
+            // For browser players, check if media position is updating (detects silent/stalled playback)
+            const mediaPosition = entity.attributes.media_position;
+            const mediaDuration = entity.attributes.media_duration;
 
-          // For live streams (duration is null, 0, or undefined), skip position checks
-          // Live streams often report a constant position value (e.g., 0) which doesn't indicate stalling
-          const isLiveStream = !mediaDuration || mediaDuration === 0;
+            // For live streams (duration is null, 0, or undefined), skip position checks
+            // Live streams often report a constant position value (e.g., 0) which doesn't indicate stalling
+            const isLiveStream = !mediaDuration || mediaDuration === 0;
 
-          if (isLiveStream) {
-            // Live stream - rely on state only, don't check position changes
-            this._lastMediaPosition = null;
-            this._mediaStallCount = 0;
-          } else if (mediaPosition !== undefined && mediaPosition !== null) {
-            // Non-live content with position tracking - check for stalls
-            if (this._lastMediaPosition !== null && mediaPosition === this._lastMediaPosition) {
-              this._mediaStallCount++;
-              console.warn(`Media position hasn't changed (${mediaPosition}s) - stall count: ${this._mediaStallCount}`);
+            if (isLiveStream) {
+              // Live stream - rely on state only, don't check position changes
+              this._lastMediaPosition = null;
+              this._mediaStallCount = 0;
+            } else if (mediaPosition !== undefined && mediaPosition !== null) {
+              // Non-live content with position tracking - check for stalls
+              if (this._lastMediaPosition !== null && mediaPosition === this._lastMediaPosition) {
+                this._mediaStallCount++;
+                console.warn(`Media position hasn't changed (${mediaPosition}s) - stall count: ${this._mediaStallCount}`);
 
-              // If position hasn't changed for 2 checks (40 seconds), consider it stalled
-              if (this._mediaStallCount >= 2) {
-                console.error('Media playback appears stalled (no position change), forcing recovery...');
+                // If position hasn't changed for 2 checks (40 seconds), consider it stalled
+                if (this._mediaStallCount >= 2) {
+                  console.error('Media playback appears stalled (no position change), forcing recovery...');
+                  this._mediaStallCount = 0;
+                  this._lastMediaPosition = null;
+                  this._recoverPlayback();
+                  return;
+                }
+              } else {
+                // Position changed, reset stall counter
                 this._mediaStallCount = 0;
-                this._lastMediaPosition = null;
-                this._recoverPlayback();
-                return;
               }
+              this._lastMediaPosition = mediaPosition;
             } else {
-              // Position changed, reset stall counter
+              // No position tracking available
+              this._lastMediaPosition = null;
               this._mediaStallCount = 0;
             }
-            this._lastMediaPosition = mediaPosition;
-          } else {
-            // No position tracking available
-            this._lastMediaPosition = null;
-            this._mediaStallCount = 0;
           }
         }
       }
