@@ -797,14 +797,17 @@ class RadioBrowserCard extends HTMLElement {
       this.updatePlaylistSelection();
       this.updateStationInfo();
 
-      // Wait longer for browser player to actually start playing
-      const waitTime = isBrowserPlayer ? 2000 : 1500;
-      setTimeout(() => {
-        const currentEntity = this._hass.states[this._selectedMediaPlayer];
-        if (currentEntity && currentEntity.state === 'playing') {
-          this.startVisualizer();
-        }
-      }, waitTime);
+      // Start visualizer after playback begins
+      // For browser players: wait 2s to ensure stream is ready
+      // For Cast/Google Mini: don't auto-start visualizer (will start when actually playing via state listener)
+      if (isBrowserPlayer) {
+        setTimeout(() => {
+          const currentEntity = this._hass.states[this._selectedMediaPlayer];
+          if (currentEntity && currentEntity.state === 'playing') {
+            this.startVisualizer();
+          }
+        }, 2000);
+      }
     } catch (error) {
       console.error('Error playing station:', error);
       alert(`Error playing station: ${error.message}`);
@@ -1207,11 +1210,11 @@ class RadioBrowserCard extends HTMLElement {
       volumeSlider.style.setProperty('--volume-percent', volumePercent + '%');
     }
 
-    // Update visualizer based on play state
-    if (entity.state === 'playing') {
+    // Start visualizer when stream is actually playing (for Cast devices that buffer)
+    // Only start if we intended to play and visualizer isn't already running
+    // NEVER stop visualizer here - let explicit stop() methods handle that
+    if (this._isPlaying && entity.state === 'playing' && !this._visualizerInterval) {
       this.startVisualizer();
-    } else {
-      this.stopVisualizer();
     }
 
     // Update station info if playing
