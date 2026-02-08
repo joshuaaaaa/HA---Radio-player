@@ -153,13 +153,12 @@ class RadioBrowserCard extends HTMLElement {
       if (!result || !result.value) return;
 
       const data = result.value;
-      const localFavs = localStorage.getItem('radio_favorites');
-      const localCustom = localStorage.getItem('radio_custom_stations');
-      const hasLocalData = (localFavs && JSON.parse(localFavs).length > 0) ||
-                           (localCustom && JSON.parse(localCustom).length > 0);
+      const hasLocalFavs = this._favorites && this._favorites.length > 0;
+      const hasLocalCustom = this._customStations && this._customStations.length > 0;
+      const hasServerData = (data.favorites?.length > 0 || data.custom_stations?.length > 0);
 
-      // Only restore if localStorage is empty (cache was cleared) and server has data
-      if (!hasLocalData && (data.favorites?.length > 0 || data.custom_stations?.length > 0)) {
+      // Only restore if local data is empty (cache was cleared) and server has data
+      if (!hasLocalFavs && !hasLocalCustom && hasServerData) {
         console.log('Cache cleared detected - restoring from HA server backup...');
         if (data.favorites?.length > 0) {
           this._favorites = data.favorites;
@@ -170,7 +169,14 @@ class RadioBrowserCard extends HTMLElement {
           localStorage.setItem('radio_custom_stations', JSON.stringify(data.custom_stations));
         }
         console.log(`Restored: ${data.favorites?.length || 0} favorites, ${data.custom_stations?.length || 0} custom stations`);
-        this.updatePlaylist();
+
+        // Force re-render to show restored data (playlist DOM may already exist)
+        if (this.shadowRoot.querySelector('.playlist-items')) {
+          this.updatePlaylist();
+        } else {
+          // DOM not ready yet, re-render the whole card
+          this.render();
+        }
       }
     } catch (e) {
       console.log('Auto-restore from HA server not available:', e);
