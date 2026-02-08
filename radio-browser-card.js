@@ -69,6 +69,11 @@ class RadioBrowserCard extends HTMLElement {
       }
     }
 
+    // On first hass connection, auto-restore from HA server if cache was cleared
+    if (!oldHass && hass) {
+      this._autoRestoreFromHA();
+    }
+
     if (!oldHass || Object.keys(oldHass.states).length !== Object.keys(hass.states).length) {
       this.updateMediaPlayers();
     }
@@ -93,6 +98,7 @@ class RadioBrowserCard extends HTMLElement {
   saveFavorites() {
     try {
       localStorage.setItem('radio_favorites', JSON.stringify(this._favorites));
+      this._autoBackupToHA();
     } catch (e) {
       console.error('Error saving favorites:', e);
     }
@@ -111,8 +117,63 @@ class RadioBrowserCard extends HTMLElement {
   saveCustomStations() {
     try {
       localStorage.setItem('radio_custom_stations', JSON.stringify(this._customStations));
+      this._autoBackupToHA();
     } catch (e) {
       console.error('Error saving custom stations:', e);
+    }
+  }
+
+  // Auto-backup to Home Assistant server (survives cache clear)
+  async _autoBackupToHA() {
+    if (!this._hass) return;
+    try {
+      await this._hass.callWS({
+        type: 'frontend/set_user_data',
+        key: 'radio_browser_backup',
+        value: {
+          favorites: this._favorites,
+          custom_stations: this._customStations,
+          timestamp: Date.now()
+        }
+      });
+      console.log('Auto-backup to HA server OK');
+    } catch (e) {
+      console.log('Auto-backup to HA server failed:', e);
+    }
+  }
+
+  // Auto-restore from Home Assistant server (after cache clear)
+  async _autoRestoreFromHA() {
+    if (!this._hass) return;
+    try {
+      const result = await this._hass.callWS({
+        type: 'frontend/get_user_data',
+        key: 'radio_browser_backup'
+      });
+      if (!result || !result.value) return;
+
+      const data = result.value;
+      const localFavs = localStorage.getItem('radio_favorites');
+      const localCustom = localStorage.getItem('radio_custom_stations');
+      const hasLocalData = (localFavs && JSON.parse(localFavs).length > 0) ||
+                           (localCustom && JSON.parse(localCustom).length > 0);
+
+      // Only restore if localStorage is empty (cache was cleared) and server has data
+      if (!hasLocalData && (data.favorites?.length > 0 || data.custom_stations?.length > 0)) {
+        console.log('Cache cleared detected - restoring from HA server backup...');
+        if (data.favorites?.length > 0) {
+          this._favorites = data.favorites;
+          localStorage.setItem('radio_favorites', JSON.stringify(data.favorites));
+        }
+        if (data.custom_stations?.length > 0) {
+          this._customStations = data.custom_stations;
+          localStorage.setItem('radio_custom_stations', JSON.stringify(data.custom_stations));
+        }
+        console.log(`Restored: ${data.favorites?.length || 0} favorites, ${data.custom_stations?.length || 0} custom stations`);
+        this.updatePlaylist();
+      }
+    } catch (e) {
+      console.log('Auto-restore from HA server not available:', e);
     }
   }
 
@@ -2600,6 +2661,11 @@ class RadioBrowserCardCompact extends HTMLElement {
     const oldHass = this._hass;
     this._hass = hass;
 
+    // On first hass connection, auto-restore from HA server if cache was cleared
+    if (!oldHass && hass) {
+      this._autoRestoreFromHA();
+    }
+
     if (!oldHass || Object.keys(oldHass.states).length !== Object.keys(hass.states).length) {
       this._updateMediaPlayers();
     }
@@ -2636,6 +2702,37 @@ class RadioBrowserCardCompact extends HTMLElement {
       }
     }
     return all;
+  }
+
+  // Auto-restore from Home Assistant server (after cache clear)
+  async _autoRestoreFromHA() {
+    if (!this._hass) return;
+    try {
+      const result = await this._hass.callWS({
+        type: 'frontend/get_user_data',
+        key: 'radio_browser_backup'
+      });
+      if (!result || !result.value) return;
+
+      const data = result.value;
+      const localFavs = localStorage.getItem('radio_favorites');
+      const localCustom = localStorage.getItem('radio_custom_stations');
+      const hasLocalData = (localFavs && JSON.parse(localFavs).length > 0) ||
+                           (localCustom && JSON.parse(localCustom).length > 0);
+
+      if (!hasLocalData && (data.favorites?.length > 0 || data.custom_stations?.length > 0)) {
+        console.log('Compact card: Restoring from HA server backup...');
+        if (data.favorites?.length > 0) {
+          localStorage.setItem('radio_favorites', JSON.stringify(data.favorites));
+        }
+        if (data.custom_stations?.length > 0) {
+          localStorage.setItem('radio_custom_stations', JSON.stringify(data.custom_stations));
+        }
+        this._updateStationSelect();
+      }
+    } catch (e) {
+      console.log('Compact card: Auto-restore not available:', e);
+    }
   }
 
   // --- State persistence ---
