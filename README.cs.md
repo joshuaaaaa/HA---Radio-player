@@ -35,6 +35,9 @@ Moderní **karta rádiového přehrávače** pro Home Assistant! Procházejte a 
 - 🎵 **Lokální MP3 soubory** - Nahrajte a přehrávejte MP3 soubory přímo v prohlížeči (trvalé uložení)
 - 🌐 **Vlastní audio streamy** - Přidejte přímé HTTP/HTTPS URL audio streamů
 - 🗑️ **Mazání vlastních stanic** - Odstraňte nahrané MP3, YouTube odkazy nebo vlastní streamy
+- 📻 **Kompaktní karta** - Minimální přehrávač s výběrem oblíbených stanic pro malé dashboardy
+- 💾 **Automatická záloha** - Automatický backup na HA server, přežije vymazání cache prohlížeče
+- 📤 **Manuální záloha** - Export/import všech dat (oblíbené + vlastní stanice) jako JSON soubor
 
 ## 📋 Požadavky
 
@@ -97,6 +100,34 @@ entity: media_player.living_room_speaker
 |---------|-----|---------|-------|
 | `name` | string | `"Radio Browser"` | Zobrazovaný název karty |
 | `entity` | string | volitelné | Předvybrat media player (lze změnit v UI) |
+
+### Kompaktní karta
+
+Minimální přehrávač, který zobrazuje pouze vaše oblíbené a vlastní stanice. Ideální pro sidebar, malé panely nebo vedlejší dashboardy.
+
+```yaml
+type: custom:radio-browser-card-compact
+name: Moje Rádio
+entity: media_player.living_room_speaker
+```
+
+#### Možnosti kompaktní karty
+
+| Možnost | Typ | Výchozí | Popis |
+|---------|-----|---------|-------|
+| `name` | string | `"Radio"` | Zobrazovaný název |
+| `entity` | string | volitelné | Předvybrat media player |
+| `show_volume` | boolean | `true` | Zobrazit/skrýt posuvník hlasitosti |
+
+**Funkce:**
+- Dropdown se všemi oblíbenými + vlastními stanicemi (sdílené s hlavní kartou)
+- Play/Pause, Stop, Předchozí, Další s loopováním stanic
+- Mini vizualizér, posuvník hlasitosti, tlačítko ztlumení
+- Tlačítka Backup/Restore pro JSON export/import
+- Automatické obnovení z HA serveru po vymazání cache
+- Zabírá pouze 1 slot karty (`getCardSize: 1`)
+
+Obě karty se načítají ze stejného souboru `radio-browser-card.js` - není potřeba žádný další resource.
 
 ## 📖 Jak používat
 
@@ -165,12 +196,24 @@ Použijte vyhledávací pole pro filtrování stanic podle názvu v reálném č
 - Přehrávání se automaticky zastaví po vypršení časovače
 - Klikněte na **Vypnout** pro zrušení časovače
 
-### 12. Export/Import oblíbených
+### 12. Záloha a obnovení
 
-- **Otevřete nastavení** (tlačítko ⚙️)
-- **Export**: Klikněte na 📤 Export pro stažení JSON souboru
-- **Import**: Klikněte na 📥 Import pro obnovení z JSON souboru
-- Sdílejte oblíbené mezi zařízeními nebo vytvářejte zálohy
+#### Automatická záloha (doporučeno)
+
+Vaše oblíbené a vlastní stanice jsou **automaticky zálohovány** na Home Assistant server při každé změně. Pokud vymažete cache prohlížeče, data se **automaticky obnoví** při načtení karty.
+
+- Používá HA `frontend/set_user_data` WebSocket API
+- Bez jakéhokoliv nastavování - funguje ihned
+- Data uložena per-uživatel v HA `.storage/frontend.user_data`
+- Přežije vymazání cache prohlížeče, funguje napříč různými prohlížeči
+
+#### Manuální záloha (JSON soubor)
+
+- **Otevřete nastavení** (tlačítko ⚙️) > **Backup & Restore**
+- **Záloha**: Klikněte 📤 Backup pro stažení JSON souboru (oblíbené + vlastní stanice)
+- **Obnovení**: Klikněte 📥 Restore pro import z JSON souboru
+- Kompaktní karta má také viditelná tlačítka 📤 Backup / 📥 Restore
+- Použijte pro přenos dat mezi instalacemi HA nebo jako extra pojistku
 
 ### 13. Přehrávání YouTube
 
@@ -314,6 +357,39 @@ name: Rádio v ložnici
 entity: media_player.bedroom
 ```
 
+### Kompaktní karta v sidebaru
+
+```yaml
+type: custom:radio-browser-card-compact
+name: Rychlé rádio
+entity: media_player.living_room
+```
+
+### Kompaktní karta bez hlasitosti
+
+```yaml
+type: custom:radio-browser-card-compact
+name: Rádio
+entity: media_player.kitchen
+show_volume: false
+```
+
+### Kombinace plné + kompaktní karty
+
+Použijte plnou kartu pro procházení/objevování stanic a kompaktní kartu pro rychlé přehrávání z oblíbených:
+
+```yaml
+# Plná karta - pro procházení a správu stanic
+type: custom:radio-browser-card
+name: Radio Browser
+entity: media_player.living_room
+
+# Kompaktní karta - pro rychlý přístup k oblíbeným (např. v sidebaru)
+type: custom:radio-browser-card-compact
+name: Rychlé přehrání
+entity: media_player.living_room
+```
+
 ## 🔧 Kompatibilní Media Playery
 
 ### Pro rozhlasové stanice
@@ -439,11 +515,13 @@ audio.src = 'https://stream.example.com/radio.mp3'; // Pro vlastní streamy
 audio.play();
 ```
 
-**Ukládání souborů:**
+**Ukládání dat:**
+- **Primární**: localStorage prohlížeče (rychlý, okamžitý přístup)
+- **Auto-záloha**: HA server přes `frontend/set_user_data` (přežije vymazání cache)
+- **Manuální záloha**: JSON soubor export/import (pro přenos mezi instalacemi)
 - **MP3 soubory**: Převedeny na base64 data URL pomocí FileReader API
-- **Uloženo v**: localStorage prohlížeče (trvalé po obnovení stránky)
-- **Vlastní stanice**: Uloženy jako JSON v localStorage
-- **Formát**:
+- **Vlastní stanice**: Uloženy jako JSON v localStorage + HA server
+- **Formát stanice**:
 ```javascript
 {
   title: "Má písnička",
@@ -451,6 +529,15 @@ audio.play();
   media_content_type: "audio/mpeg",
   source: "local_mp3",
   fileName: "song.mp3"
+}
+```
+- **Formát zálohy JSON (v2.0)**:
+```json
+{
+  "version": "2.0",
+  "exported": "2026-02-08T12:00:00.000Z",
+  "favorites": [...],
+  "custom_stations": [...]
 }
 ```
 

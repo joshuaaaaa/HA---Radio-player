@@ -38,6 +38,9 @@ A modern **radio player card** for Home Assistant! Browse and play internet radi
 - 🎵 **Local MP3 Files** - Upload and play MP3 files directly in browser (persistent storage)
 - 🌐 **Custom Audio Streams** - Add direct HTTP/HTTPS audio stream URLs
 - 🗑️ **Delete Custom Stations** - Remove uploaded MP3s, YouTube links, or custom streams
+- 📻 **Compact Card** - Minimal player card with favorite station selector for small dashboards
+- 💾 **Auto Backup** - Automatic backup to HA server, survives browser cache clearing
+- 📤 **Manual Backup** - Export/import all data (favorites + custom stations) as JSON file
 
 ## 📋 Requirements
 
@@ -100,6 +103,34 @@ entity: media_player.living_room_speaker
 |--------|------|---------|-------------|
 | `name` | string | `"Radio Browser"` | Display name shown in the card |
 | `entity` | string | optional | Pre-select a media player (can be changed in UI) |
+
+### Compact Card
+
+A minimal radio player card that shows only your favorite and custom stations. Perfect for sidebars, small panels, or secondary dashboards.
+
+```yaml
+type: custom:radio-browser-card-compact
+name: My Radio
+entity: media_player.living_room_speaker
+```
+
+#### Compact Card Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `name` | string | `"Radio"` | Display name |
+| `entity` | string | optional | Pre-select a media player |
+| `show_volume` | boolean | `true` | Show/hide volume slider |
+
+**Features:**
+- Dropdown with all favorite + custom stations (shared with main card)
+- Play/Pause, Stop, Previous, Next controls with station looping
+- Mini visualizer, volume slider, mute button
+- Backup/Restore buttons for JSON export/import
+- Auto-restore from HA server after cache clear
+- Takes only 1 card slot (`getCardSize: 1`)
+
+Both cards are loaded from the same `radio-browser-card.js` file - no extra resource needed.
 
 ## 📖 How to Use
 
@@ -168,12 +199,24 @@ Use the search box to filter stations by name in real-time:
 - Playback stops automatically when timer expires
 - Click **Off** to cancel the timer
 
-### 12. Export/Import Favorites
+### 12. Backup & Restore
 
-- **Open Settings** (⚙️ button)
-- **Export**: Click 📤 Export to download JSON file
-- **Import**: Click 📥 Import to restore from JSON file
-- Share favorites between devices or create backups
+#### Automatic Backup (recommended)
+
+Your favorites and custom stations are **automatically backed up** to the Home Assistant server every time you make a change. If you clear your browser cache, the data is **automatically restored** when the card loads.
+
+- Uses HA's `frontend/set_user_data` WebSocket API
+- Zero configuration needed - works out of the box
+- Data stored per-user in HA's `.storage/frontend.user_data`
+- Survives browser cache clearing, works across different browsers
+
+#### Manual Backup (JSON file)
+
+- **Open Settings** (⚙️ button) > **Backup & Restore**
+- **Backup**: Click 📤 Backup to download JSON file (favorites + custom stations)
+- **Restore**: Click 📥 Restore to import from JSON file
+- The compact card also has visible 📤 Backup / 📥 Restore buttons
+- Use for transferring data between HA installations or as extra safety
 
 ### 13. YouTube Playback
 
@@ -317,6 +360,39 @@ name: Bedroom Radio
 entity: media_player.bedroom
 ```
 
+### Compact Card in Sidebar
+
+```yaml
+type: custom:radio-browser-card-compact
+name: Quick Radio
+entity: media_player.living_room
+```
+
+### Compact Card Without Volume
+
+```yaml
+type: custom:radio-browser-card-compact
+name: Radio
+entity: media_player.kitchen
+show_volume: false
+```
+
+### Full + Compact Combo
+
+Use the full card for browsing/discovering stations and the compact card for quick playback from favorites:
+
+```yaml
+# Full card - for browsing and managing stations
+type: custom:radio-browser-card
+name: Radio Browser
+entity: media_player.living_room
+
+# Compact card - for quick access to favorites (e.g. in sidebar)
+type: custom:radio-browser-card-compact
+name: Quick Play
+entity: media_player.living_room
+```
+
 ## 🔧 Compatible Media Players
 
 ### For Radio Stations
@@ -442,11 +518,13 @@ audio.src = 'https://stream.example.com/radio.mp3'; // For custom streams
 audio.play();
 ```
 
-**File Storage:**
+**Data Storage:**
+- **Primary**: Browser localStorage (fast, instant access)
+- **Auto-backup**: HA server via `frontend/set_user_data` (survives cache clear)
+- **Manual backup**: JSON file export/import (for transfers between installations)
 - **MP3 Files**: Converted to base64 data URLs using FileReader API
-- **Stored in**: Browser localStorage (persistent across page reloads)
-- **Custom Stations**: Saved as JSON in localStorage
-- **Format**:
+- **Custom Stations**: Saved as JSON in localStorage + HA server
+- **Station Format**:
 ```javascript
 {
   title: "My Song",
@@ -454,6 +532,15 @@ audio.play();
   media_content_type: "audio/mpeg",
   source: "local_mp3",
   fileName: "song.mp3"
+}
+```
+- **Backup JSON Format (v2.0)**:
+```json
+{
+  "version": "2.0",
+  "exported": "2026-02-08T12:00:00.000Z",
+  "favorites": [...],
+  "custom_stations": [...]
 }
 ```
 
