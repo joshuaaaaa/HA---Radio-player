@@ -2547,3 +2547,773 @@ window.customCards.push({
   name: 'Radio Browser Card',
   description: 'Modern radio player card for Home Assistant with gradient design and smooth controls'
 });
+
+// ============================================================================
+// COMPACT RADIO CARD - Minimal player with favorite station selector
+// ============================================================================
+class RadioBrowserCardCompact extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+    this._favorites = this._loadFavorites();
+    this._customStations = this._loadCustomStations();
+    this._mediaPlayers = [];
+    this._selectedMediaPlayer = null;
+    this._selectedStationIndex = -1;
+    this._isPlaying = false;
+    this._isMuted = false;
+    this._volume = 30;
+    this._volumeBeforeMute = 30;
+    this._audioElement = null;
+    this._isUsingDirectPlayback = false;
+    this._visualizerInterval = null;
+    this._theme = localStorage.getItem('radio_compact_theme') || 'dark';
+    this._currentStationMetadata = null;
+
+    this._restoreState();
+  }
+
+  setConfig(config) {
+    this.config = {
+      name: config.name || 'Radio',
+      entity: config.entity || null,
+      show_volume: config.show_volume !== false,
+      ...config
+    };
+    if (this.config.entity && !this._selectedMediaPlayer) {
+      this._selectedMediaPlayer = this.config.entity;
+    }
+    this.render();
+  }
+
+  set hass(hass) {
+    const oldHass = this._hass;
+    this._hass = hass;
+
+    if (!oldHass || Object.keys(oldHass.states).length !== Object.keys(hass.states).length) {
+      this._updateMediaPlayers();
+    }
+
+    this._updateDisplay();
+  }
+
+  // --- Data (shared with main card via localStorage) ---
+  _loadFavorites() {
+    try {
+      const stored = localStorage.getItem('radio_favorites');
+      return stored ? JSON.parse(stored) : [];
+    } catch (e) { return []; }
+  }
+
+  _loadCustomStations() {
+    try {
+      const stored = localStorage.getItem('radio_custom_stations');
+      return stored ? JSON.parse(stored) : [];
+    } catch (e) { return []; }
+  }
+
+  _getAllStations() {
+    // Reload from localStorage each time to pick up changes from the main card
+    this._favorites = this._loadFavorites();
+    this._customStations = this._loadCustomStations();
+    // Deduplicate by media_content_id
+    const seen = new Set();
+    const all = [];
+    for (const s of [...this._favorites, ...this._customStations]) {
+      if (!seen.has(s.media_content_id)) {
+        seen.add(s.media_content_id);
+        all.push(s);
+      }
+    }
+    return all;
+  }
+
+  // --- State persistence ---
+  _saveState() {
+    try {
+      localStorage.setItem('radio_compact_state', JSON.stringify({
+        selectedMediaPlayer: this._selectedMediaPlayer,
+        selectedStationIndex: this._selectedStationIndex,
+        volume: this._volume,
+        timestamp: Date.now()
+      }));
+    } catch (e) {}
+  }
+
+  _restoreState() {
+    try {
+      const stored = localStorage.getItem('radio_compact_state');
+      if (!stored) return;
+      const state = JSON.parse(stored);
+      if (Date.now() - state.timestamp < 30 * 60 * 1000) {
+        this._selectedMediaPlayer = state.selectedMediaPlayer;
+        this._selectedStationIndex = state.selectedStationIndex ?? -1;
+        this._volume = state.volume ?? 30;
+      }
+    } catch (e) {}
+  }
+
+  // --- Media players ---
+  _updateMediaPlayers() {
+    if (!this._hass) return;
+    this._mediaPlayers = Object.keys(this._hass.states)
+      .filter(id => id.startsWith('media_player.'))
+      .map(id => ({ entity_id: id, name: this._hass.states[id].attributes.friendly_name || id }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    if (!this._selectedMediaPlayer && this._mediaPlayers.length > 0) {
+      this._selectedMediaPlayer = this._mediaPlayers[0].entity_id;
+    }
+    this._updatePlayerSelect();
+  }
+
+  _updatePlayerSelect() {
+    const sel = this.shadowRoot?.querySelector('.compact-player-select');
+    if (!sel) return;
+    const current = this._selectedMediaPlayer;
+    sel.innerHTML = '<option value="">Player...</option>';
+    this._mediaPlayers.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.entity_id;
+      opt.textContent = p.name;
+      opt.selected = p.entity_id === current;
+      sel.appendChild(opt);
+    });
+  }
+
+  // --- Station select ---
+  _updateStationSelect() {
+    const sel = this.shadowRoot?.querySelector('.compact-station-select');
+    if (!sel) return;
+    const stations = this._getAllStations();
+    sel.innerHTML = '<option value="-1">Select station...</option>';
+    stations.forEach((s, i) => {
+      const opt = document.createElement('option');
+      opt.value = i;
+      const badge = s.source === 'youtube' ? '▶ ' : s.source === 'local_mp3' ? '♫ ' : s.source === 'custom_stream' ? '● ' : '★ ';
+      opt.textContent = badge + s.title;
+      opt.selected = i === this._selectedStationIndex;
+      sel.appendChild(opt);
+    });
+  }
+
+  // --- Playback ---
+  async _playStation(index) {
+    const stations = this._getAllStations();
+    const station = stations[index];
+    if (!station) return;
+
+    this._selectedStationIndex = index;
+    this._currentStationMetadata = { title: station.title, source: station.source || 'radio' };
+
+    // Direct browser playback for local MP3 and custom streams
+    if (station.source === 'local_mp3' || station.source === 'custom_stream') {
+      this._playDirectInBrowser(station);
+      return;
+    }
+
+    // HA media player playback
+    if (!this._hass || !this._selectedMediaPlayer) return;
+
+    try {
+      await this._hass.callService('media_player', 'volume_set', {
+        entity_id: this._selectedMediaPlayer,
+        volume_level: this._volume / 100
+      });
+
+      await this._hass.callService('media_player', 'play_media', {
+        entity_id: this._selectedMediaPlayer,
+        media_content_id: station.media_content_id,
+        media_content_type: station.media_content_type
+      });
+
+      if (this._audioElement) {
+        this._audioElement.pause();
+        this._isUsingDirectPlayback = false;
+      }
+
+      this._isPlaying = true;
+      this._saveState();
+      this._updateUI();
+      setTimeout(() => this._startVisualizer(), 2000);
+    } catch (error) {
+      console.error('Compact card: Error playing station:', error);
+    }
+  }
+
+  _playDirectInBrowser(station) {
+    if (!this._audioElement) {
+      this._audioElement = this.shadowRoot.querySelector('.compact-audio');
+      if (!this._audioElement) return;
+
+      this._audioElement.addEventListener('play', () => {
+        this._isPlaying = true;
+        this._startVisualizer();
+        this._updateUI();
+      });
+      this._audioElement.addEventListener('pause', () => {
+        this._isPlaying = false;
+        this._stopVisualizer();
+        this._updateUI();
+      });
+      this._audioElement.addEventListener('error', () => {
+        this._isPlaying = false;
+        this._stopVisualizer();
+        this._updateUI();
+      });
+    }
+
+    if (this._hass && this._selectedMediaPlayer) {
+      this._hass.callService('media_player', 'media_stop', {
+        entity_id: this._selectedMediaPlayer
+      }).catch(() => {});
+    }
+
+    this._audioElement.src = station.media_content_id;
+    this._audioElement.volume = this._volume / 100;
+    this._audioElement.play().then(() => {
+      this._isUsingDirectPlayback = true;
+      this._isPlaying = true;
+      this._saveState();
+      this._updateUI();
+    }).catch(err => {
+      console.error('Compact card: Direct play error:', err);
+    });
+  }
+
+  async _togglePlay() {
+    if (this._isUsingDirectPlayback && this._audioElement) {
+      if (this._audioElement.paused) {
+        this._audioElement.play();
+      } else {
+        this._audioElement.pause();
+      }
+      return;
+    }
+
+    if (!this._hass || !this._selectedMediaPlayer) return;
+
+    const entity = this._hass.states[this._selectedMediaPlayer];
+    if (!entity) return;
+
+    if (entity.state !== 'playing' && entity.state !== 'paused') {
+      if (this._selectedStationIndex >= 0) {
+        await this._playStation(this._selectedStationIndex);
+      }
+      return;
+    }
+
+    try {
+      await this._hass.callService('media_player', 'media_play_pause', {
+        entity_id: this._selectedMediaPlayer
+      });
+    } catch (error) {
+      console.error('Compact card: toggle play error:', error);
+    }
+  }
+
+  async _stop() {
+    if (this._isUsingDirectPlayback && this._audioElement) {
+      this._audioElement.pause();
+      this._audioElement.currentTime = 0;
+      this._isUsingDirectPlayback = false;
+    } else if (this._hass && this._selectedMediaPlayer) {
+      try {
+        await this._hass.callService('media_player', 'media_stop', {
+          entity_id: this._selectedMediaPlayer
+        });
+      } catch (error) {
+        console.error('Compact card: stop error:', error);
+      }
+    }
+
+    this._isPlaying = false;
+    this._currentStationMetadata = null;
+    this._stopVisualizer();
+    this._saveState();
+    this._updateUI();
+  }
+
+  async _handleVolumeChange(e) {
+    this._volume = parseFloat(e.target.value);
+    const vol = this._volume / 100;
+
+    const slider = this.shadowRoot?.querySelector('.compact-volume');
+    if (slider) slider.style.setProperty('--vol', this._volume + '%');
+
+    if (this._audioElement) this._audioElement.volume = vol;
+    if (this._hass && this._selectedMediaPlayer) {
+      try {
+        await this._hass.callService('media_player', 'volume_set', {
+          entity_id: this._selectedMediaPlayer,
+          volume_level: vol
+        });
+      } catch (e) {}
+    }
+    this._saveState();
+  }
+
+  _toggleMute() {
+    const slider = this.shadowRoot?.querySelector('.compact-volume');
+    if (!slider) return;
+    if (this._isMuted) {
+      this._isMuted = false;
+      slider.value = this._volumeBeforeMute;
+      this._handleVolumeChange({ target: { value: this._volumeBeforeMute } });
+    } else {
+      this._volumeBeforeMute = this._volume;
+      this._isMuted = true;
+      slider.value = 0;
+      this._handleVolumeChange({ target: { value: 0 } });
+    }
+    this._updateUI();
+  }
+
+  _playNext() {
+    const stations = this._getAllStations();
+    if (stations.length === 0) return;
+    const next = (this._selectedStationIndex + 1) % stations.length;
+    this._selectedStationIndex = next;
+    this._updateStationSelect();
+    this._playStation(next);
+  }
+
+  _playPrev() {
+    const stations = this._getAllStations();
+    if (stations.length === 0) return;
+    const prev = this._selectedStationIndex <= 0 ? stations.length - 1 : this._selectedStationIndex - 1;
+    this._selectedStationIndex = prev;
+    this._updateStationSelect();
+    this._playStation(prev);
+  }
+
+  // --- Visualizer ---
+  _startVisualizer() {
+    if (this._visualizerInterval) return;
+    const canvas = this.shadowRoot?.querySelector('.compact-visualizer');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const colors = this._getThemeColors();
+    const bars = 12;
+    const barW = Math.floor(canvas.width / bars);
+    const heights = new Array(bars).fill(0);
+
+    this._visualizerInterval = setInterval(() => {
+      ctx.fillStyle = colors.surface;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      for (let i = 0; i < bars; i++) {
+        heights[i] = heights[i] * 0.7 + Math.random() * canvas.height * 0.3;
+        ctx.fillStyle = colors.primary;
+        ctx.fillRect(i * barW + 1, canvas.height - heights[i], barW - 2, heights[i]);
+      }
+    }, 50);
+  }
+
+  _stopVisualizer() {
+    if (this._visualizerInterval) {
+      clearInterval(this._visualizerInterval);
+      this._visualizerInterval = null;
+      const canvas = this.shadowRoot?.querySelector('.compact-visualizer');
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = this._getThemeColors().surface;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+  }
+
+  // --- Display ---
+  _updateDisplay() {
+    if (!this._hass || !this._selectedMediaPlayer) return;
+    const entity = this._hass.states[this._selectedMediaPlayer];
+    if (!entity) return;
+
+    if (this._isPlaying && entity.state === 'playing' && !this._visualizerInterval) {
+      this._startVisualizer();
+    }
+
+    const titleEl = this.shadowRoot?.querySelector('.compact-title');
+    if (titleEl) {
+      if (this._currentStationMetadata) {
+        titleEl.textContent = this._currentStationMetadata.title;
+      } else if (entity.attributes.media_title) {
+        titleEl.textContent = entity.attributes.media_title;
+      }
+    }
+
+    // Sync volume from HA entity
+    if (entity.attributes.volume_level !== undefined) {
+      const vol = Math.round(entity.attributes.volume_level * 100);
+      const slider = this.shadowRoot?.querySelector('.compact-volume');
+      if (slider && !this._isMuted) {
+        slider.value = vol;
+        slider.style.setProperty('--vol', vol + '%');
+        this._volume = vol;
+      }
+    }
+  }
+
+  _updateUI() {
+    const playBtn = this.shadowRoot?.querySelector('.compact-play-btn');
+    if (playBtn) {
+      playBtn.textContent = this._isPlaying ? '⏸' : '▶';
+    }
+    const muteBtn = this.shadowRoot?.querySelector('.compact-mute-btn');
+    if (muteBtn) {
+      muteBtn.textContent = this._isMuted ? '🔇' : '🔊';
+    }
+    const titleEl = this.shadowRoot?.querySelector('.compact-title');
+    if (titleEl && this._currentStationMetadata) {
+      titleEl.textContent = this._currentStationMetadata.title;
+    } else if (titleEl && !this._isPlaying) {
+      titleEl.textContent = this.config?.name || 'Radio';
+    }
+  }
+
+  // --- Theme ---
+  _getThemeColors() {
+    const themes = {
+      dark: {
+        background: '#121212', surface: '#181818', surfaceLight: '#282828',
+        surfaceLighter: '#333333', primary: '#1DB954', primaryHover: '#1ed760',
+        text: '#ffffff', textSecondary: '#b3b3b3', textTertiary: '#535353'
+      },
+      light: {
+        background: '#ffffff', surface: '#f5f5f5', surfaceLight: '#e0e0e0',
+        surfaceLighter: '#d0d0d0', primary: '#1DB954', primaryHover: '#1ed760',
+        text: '#000000', textSecondary: '#666666', textTertiary: '#999999'
+      },
+      custom: {
+        background: this.config?.theme_background || '#121212',
+        surface: this.config?.theme_surface || '#181818',
+        surfaceLight: this.config?.theme_surface_light || '#282828',
+        surfaceLighter: this.config?.theme_surface_lighter || '#333333',
+        primary: this.config?.theme_primary || '#1DB954',
+        primaryHover: this.config?.theme_primary_hover || '#1ed760',
+        text: this.config?.theme_text || '#ffffff',
+        textSecondary: this.config?.theme_text_secondary || '#b3b3b3',
+        textTertiary: this.config?.theme_text_tertiary || '#535353'
+      }
+    };
+    return themes[this._theme] || themes.dark;
+  }
+
+  _escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // --- Render ---
+  render() {
+    const c = this._getThemeColors();
+    const showVol = this.config?.show_volume !== false;
+
+    this.shadowRoot.innerHTML = `
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :host { display: block; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+
+        .compact-card {
+          background: ${c.background};
+          border-radius: 12px;
+          padding: 12px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+          max-width: 380px;
+          width: 100%;
+        }
+
+        /* Top row: visualizer + title + controls */
+        .compact-top {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 8px;
+        }
+
+        .compact-visualizer {
+          width: 48px;
+          height: 28px;
+          border-radius: 4px;
+          background: ${c.surface};
+          flex-shrink: 0;
+        }
+
+        .compact-title {
+          flex: 1;
+          color: ${c.text};
+          font-size: 13px;
+          font-weight: 600;
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+          min-width: 0;
+        }
+
+        .compact-controls {
+          display: flex;
+          gap: 4px;
+          flex-shrink: 0;
+        }
+
+        .compact-btn {
+          width: 32px;
+          height: 32px;
+          border: none;
+          border-radius: 8px;
+          background: ${c.surfaceLight};
+          color: ${c.textSecondary};
+          font-size: 14px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.15s ease;
+        }
+        .compact-btn:hover {
+          background: ${c.surfaceLighter};
+          color: ${c.text};
+          transform: translateY(-1px);
+        }
+        .compact-btn:active { transform: translateY(0); }
+
+        .compact-play-btn {
+          background: ${c.primary};
+          color: #fff;
+          font-size: 15px;
+        }
+        .compact-play-btn:hover {
+          background: ${c.primaryHover};
+          color: #fff;
+        }
+
+        /* Station & player selectors row */
+        .compact-selectors {
+          display: flex;
+          gap: 6px;
+          margin-bottom: ${showVol ? '8px' : '0'};
+        }
+
+        .compact-station-select {
+          flex: 2;
+          height: 32px;
+          background: ${c.surfaceLight};
+          color: ${c.text};
+          border: 1px solid transparent;
+          border-radius: 6px;
+          font-size: 11px;
+          font-family: inherit;
+          padding: 0 8px;
+          cursor: pointer;
+          transition: border-color 0.2s;
+          min-width: 0;
+        }
+        .compact-station-select:focus {
+          outline: none;
+          border-color: ${c.primary};
+        }
+        .compact-station-select option {
+          background: ${c.surfaceLight};
+          color: ${c.text};
+        }
+
+        .compact-player-select {
+          flex: 1;
+          height: 32px;
+          background: ${c.surfaceLight};
+          color: ${c.textSecondary};
+          border: 1px solid transparent;
+          border-radius: 6px;
+          font-size: 10px;
+          font-family: inherit;
+          padding: 0 6px;
+          cursor: pointer;
+          transition: border-color 0.2s;
+          min-width: 0;
+        }
+        .compact-player-select:focus {
+          outline: none;
+          border-color: ${c.primary};
+        }
+        .compact-player-select option {
+          background: ${c.surfaceLight};
+          color: ${c.text};
+        }
+
+        /* Volume row */
+        .compact-volume-row {
+          display: ${showVol ? 'flex' : 'none'};
+          align-items: center;
+          gap: 8px;
+        }
+
+        .compact-mute-btn {
+          width: 28px;
+          height: 28px;
+          border: none;
+          border-radius: 6px;
+          background: ${c.surfaceLight};
+          color: ${c.textSecondary};
+          font-size: 13px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          transition: all 0.15s;
+        }
+        .compact-mute-btn:hover {
+          background: ${c.surfaceLighter};
+          color: ${c.text};
+        }
+
+        .compact-volume {
+          flex: 1;
+          height: 4px;
+          -webkit-appearance: none;
+          background: linear-gradient(to right, ${c.primary} 0%, ${c.primary} var(--vol, 30%), ${c.surfaceLight} var(--vol, 30%), ${c.surfaceLight} 100%);
+          border-radius: 2px;
+          outline: none;
+          cursor: pointer;
+        }
+        .compact-volume::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          width: 12px; height: 12px;
+          background: ${c.primary};
+          border-radius: 50%;
+          cursor: pointer;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        .compact-volume::-moz-range-thumb {
+          width: 12px; height: 12px;
+          background: ${c.primary};
+          border-radius: 50%;
+          border: none;
+          cursor: pointer;
+        }
+        .compact-volume::-moz-range-track {
+          height: 4px;
+          background: ${c.surfaceLight};
+          border-radius: 2px;
+        }
+        .compact-volume::-moz-range-progress {
+          height: 4px;
+          background: ${c.primary};
+          border-radius: 2px;
+        }
+
+        /* Empty state */
+        .compact-empty {
+          color: ${c.textTertiary};
+          font-size: 11px;
+          text-align: center;
+          padding: 8px 0;
+        }
+        .compact-empty a {
+          color: ${c.primary};
+          text-decoration: none;
+        }
+      </style>
+
+      <div class="compact-card">
+        <!-- Top: visualizer + title + play controls -->
+        <div class="compact-top">
+          <canvas class="compact-visualizer" width="48" height="28"></canvas>
+          <div class="compact-title">${this._escapeHtml(this.config?.name || 'Radio')}</div>
+          <div class="compact-controls">
+            <button class="compact-btn" title="Previous">⏮</button>
+            <button class="compact-btn compact-play-btn" title="Play/Pause">${this._isPlaying ? '⏸' : '▶'}</button>
+            <button class="compact-btn" title="Stop">⏹</button>
+            <button class="compact-btn" title="Next">⏭</button>
+          </div>
+        </div>
+
+        <!-- Selectors: station + player -->
+        <div class="compact-selectors">
+          <select class="compact-station-select">
+            <option value="-1">Select station...</option>
+          </select>
+          <select class="compact-player-select">
+            <option value="">Player...</option>
+          </select>
+        </div>
+
+        <!-- Volume -->
+        <div class="compact-volume-row">
+          <button class="compact-mute-btn" title="Mute">${this._isMuted ? '🔇' : '🔊'}</button>
+          <input type="range" class="compact-volume" min="0" max="100" value="${this._volume}" style="--vol: ${this._volume}%;">
+        </div>
+
+        <audio class="compact-audio" style="display:none;"></audio>
+      </div>
+    `;
+
+    this._setupListeners();
+
+    // Populate selects
+    if (this._mediaPlayers.length > 0) this._updatePlayerSelect();
+    this._updateStationSelect();
+  }
+
+  _setupListeners() {
+    const root = this.shadowRoot;
+
+    // Play controls
+    const btns = root.querySelectorAll('.compact-controls .compact-btn');
+    if (btns[0]) btns[0].addEventListener('click', () => this._playPrev());
+    if (btns[1]) btns[1].addEventListener('click', () => this._togglePlay());
+    if (btns[2]) btns[2].addEventListener('click', () => this._stop());
+    if (btns[3]) btns[3].addEventListener('click', () => this._playNext());
+
+    // Station select
+    const stationSel = root.querySelector('.compact-station-select');
+    if (stationSel) {
+      stationSel.addEventListener('change', (e) => {
+        const idx = parseInt(e.target.value);
+        if (idx >= 0) {
+          this._playStation(idx);
+        }
+      });
+    }
+
+    // Player select
+    const playerSel = root.querySelector('.compact-player-select');
+    if (playerSel) {
+      playerSel.addEventListener('change', (e) => {
+        this._selectedMediaPlayer = e.target.value;
+        this._saveState();
+      });
+    }
+
+    // Volume
+    const volSlider = root.querySelector('.compact-volume');
+    if (volSlider) {
+      volSlider.addEventListener('input', (e) => this._handleVolumeChange(e));
+    }
+
+    // Mute
+    const muteBtn = root.querySelector('.compact-mute-btn');
+    if (muteBtn) {
+      muteBtn.addEventListener('click', () => this._toggleMute());
+    }
+  }
+
+  disconnectedCallback() {
+    this._stopVisualizer();
+  }
+
+  static getStubConfig() {
+    return { name: 'Radio Compact' };
+  }
+
+  getCardSize() {
+    return 1;
+  }
+}
+
+customElements.define('radio-browser-card-compact', RadioBrowserCardCompact);
+window.customCards.push({
+  type: 'radio-browser-card-compact',
+  name: 'Radio Browser Card Compact',
+  description: 'Compact radio player with favorite station selector for Home Assistant'
+});
