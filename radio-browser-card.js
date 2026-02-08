@@ -306,19 +306,20 @@ class RadioBrowserCard extends HTMLElement {
     return this._favorites.some(fav => fav.media_content_id === station.media_content_id);
   }
 
-  // Export/Import favorites
+  // Export/Import favorites + custom stations
   exportFavorites() {
     const data = {
-      version: '1.0',
+      version: '2.0',
       exported: new Date().toISOString(),
-      favorites: this._favorites
+      favorites: this._favorites,
+      custom_stations: this._customStations
     };
     const json = JSON.stringify(data, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `radio-favorites-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `radio-backup-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -335,16 +336,25 @@ class RadioBrowserCard extends HTMLElement {
       reader.onload = (event) => {
         try {
           const data = JSON.parse(event.target.result);
+          const parts = [];
           if (data.favorites && Array.isArray(data.favorites)) {
             this._favorites = data.favorites;
             this.saveFavorites();
+            parts.push(`${data.favorites.length} favorites`);
+          }
+          if (data.custom_stations && Array.isArray(data.custom_stations)) {
+            this._customStations = data.custom_stations;
+            this.saveCustomStations();
+            parts.push(`${data.custom_stations.length} custom stations`);
+          }
+          if (parts.length > 0) {
             this.updatePlaylist();
-            alert(`Imported ${data.favorites.length} favorite stations!`);
+            alert(`Imported: ${parts.join(', ')}!`);
           } else {
             alert('Invalid file format');
           }
         } catch (error) {
-          alert('Error importing favorites: ' + error.message);
+          alert('Error importing: ' + error.message);
         }
       };
       reader.readAsText(file);
@@ -2239,10 +2249,10 @@ class RadioBrowserCard extends HTMLElement {
               </div>
             </div>
             <div class="settings-group">
-              <div class="settings-label">Favorites</div>
+              <div class="settings-label">Backup & Restore</div>
               <div class="settings-options">
-                <button class="settings-option" onclick="this.getRootNode().host.exportFavorites()">📤 Export</button>
-                <button class="settings-option" onclick="this.getRootNode().host.importFavorites()">📥 Import</button>
+                <button class="settings-option" onclick="this.getRootNode().host.exportFavorites()">📤 Backup</button>
+                <button class="settings-option" onclick="this.getRootNode().host.importFavorites()">📥 Restore</button>
               </div>
             </div>
           </div>
@@ -3004,6 +3014,61 @@ class RadioBrowserCardCompact extends HTMLElement {
     return div.innerHTML;
   }
 
+  // --- Export/Import (shared format with main card) ---
+  _exportFavorites() {
+    const favorites = this._loadFavorites();
+    const customStations = this._loadCustomStations();
+    const data = {
+      version: '2.0',
+      exported: new Date().toISOString(),
+      favorites: favorites,
+      custom_stations: customStations
+    };
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `radio-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  _importFavorites() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json';
+    input.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const data = JSON.parse(event.target.result);
+          const parts = [];
+          if (data.favorites && Array.isArray(data.favorites)) {
+            localStorage.setItem('radio_favorites', JSON.stringify(data.favorites));
+            parts.push(`${data.favorites.length} favorites`);
+          }
+          if (data.custom_stations && Array.isArray(data.custom_stations)) {
+            localStorage.setItem('radio_custom_stations', JSON.stringify(data.custom_stations));
+            parts.push(`${data.custom_stations.length} custom stations`);
+          }
+          if (parts.length > 0) {
+            this._updateStationSelect();
+            alert(`Imported: ${parts.join(', ')}!`);
+          } else {
+            alert('Invalid file format');
+          }
+        } catch (error) {
+          alert('Error importing: ' + error.message);
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  }
+
   // --- Render ---
   render() {
     const c = this._getThemeColors();
@@ -3213,6 +3278,34 @@ class RadioBrowserCardCompact extends HTMLElement {
           color: ${c.primary};
           text-decoration: none;
         }
+
+        /* Backup row */
+        .compact-backup-row {
+          display: flex;
+          gap: 4px;
+          margin-top: 8px;
+        }
+        .compact-backup-btn {
+          flex: 1;
+          height: 26px;
+          border: 1px solid ${c.surfaceLighter};
+          border-radius: 6px;
+          background: ${c.surfaceLight};
+          color: ${c.textSecondary};
+          font-size: 10px;
+          font-family: inherit;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+          transition: all 0.15s;
+        }
+        .compact-backup-btn:hover {
+          background: ${c.surfaceLighter};
+          color: ${c.text};
+          border-color: ${c.primary};
+        }
       </style>
 
       <div class="compact-card">
@@ -3242,6 +3335,12 @@ class RadioBrowserCardCompact extends HTMLElement {
         <div class="compact-volume-row">
           <button class="compact-mute-btn" title="Mute">${this._isMuted ? '🔇' : '🔊'}</button>
           <input type="range" class="compact-volume" min="0" max="100" value="${this._volume}" style="--vol: ${this._volume}%;">
+        </div>
+
+        <!-- Backup buttons -->
+        <div class="compact-backup-row">
+          <button class="compact-backup-btn compact-export-btn" title="Export favorites & stations to JSON file">📤 Backup</button>
+          <button class="compact-backup-btn compact-import-btn" title="Import favorites & stations from JSON file">📥 Restore</button>
         </div>
 
         <audio class="compact-audio" style="display:none;"></audio>
@@ -3295,6 +3394,16 @@ class RadioBrowserCardCompact extends HTMLElement {
     const muteBtn = root.querySelector('.compact-mute-btn');
     if (muteBtn) {
       muteBtn.addEventListener('click', () => this._toggleMute());
+    }
+
+    // Backup buttons
+    const exportBtn = root.querySelector('.compact-export-btn');
+    if (exportBtn) {
+      exportBtn.addEventListener('click', () => this._exportFavorites());
+    }
+    const importBtn = root.querySelector('.compact-import-btn');
+    if (importBtn) {
+      importBtn.addEventListener('click', () => this._importFavorites());
     }
   }
 
